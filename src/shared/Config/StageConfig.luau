@@ -76,7 +76,7 @@ local definitions: { Types.StageDefinition } = {
 		minPossibleMs = seconds(28),
 		checkpointCount = 3,
 		originX = 6000,
-		hasLayout = false,
+		hasLayout = true,
 		requires = "stage_03_scrapyard",
 	},
 	{
@@ -90,7 +90,7 @@ local definitions: { Types.StageDefinition } = {
 		minPossibleMs = seconds(34),
 		checkpointCount = 4,
 		originX = 8000,
-		hasLayout = false,
+		hasLayout = true,
 		requires = "stage_04_crossfire",
 	},
 
@@ -120,7 +120,7 @@ local definitions: { Types.StageDefinition } = {
 		minPossibleMs = seconds(38),
 		checkpointCount = 3,
 		originX = 12000,
-		hasLayout = false,
+		hasLayout = true,
 		requires = "stage_06_assembly",
 	},
 	{
@@ -134,7 +134,7 @@ local definitions: { Types.StageDefinition } = {
 		minPossibleMs = seconds(46),
 		checkpointCount = 4,
 		originX = 14000,
-		hasLayout = false,
+		hasLayout = true,
 		requires = "stage_07_cadence",
 	},
 
@@ -150,7 +150,7 @@ local definitions: { Types.StageDefinition } = {
 		minPossibleMs = seconds(45),
 		checkpointCount = 1,
 		originX = 16000,
-		hasLayout = false,
+		hasLayout = true,
 		requires = "stage_08_foundry",
 	},
 	{
@@ -164,7 +164,7 @@ local definitions: { Types.StageDefinition } = {
 		minPossibleMs = seconds(75),
 		checkpointCount = 2,
 		originX = 18000,
-		hasLayout = false,
+		hasLayout = true,
 		requires = "stage_09_miniboss",
 	},
 

@@ -185,6 +185,17 @@ function ClingController.Engage(player: Player, surface: BasePart, hitPosition: 
 	return true
 end
 
+--- Drops everyone currently latched to a surface. MotionService calls this the
+--- moment a wall's polarity dies — being carried by a wall that is no longer
+--- magnetic would be the single most confusing thing in the timing stages.
+function ClingController.ReleaseFromSurface(surface: BasePart, launch: boolean?)
+	for player, state in states do
+		if state.surface == surface then
+			ClingController.Release(player, launch == true)
+		end
+	end
+end
+
 function ClingController.Release(player: Player, launch: boolean)
 	local state = states[player]
 	if not state then

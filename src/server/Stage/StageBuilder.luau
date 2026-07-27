@@ -20,7 +20,12 @@ local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
 local GameConfig = require(Shared.Config.GameConfig)
 local Types = require(Shared.Types)
 
+-- Required for its BossSpec type only; StageService does the actual spawning.
+local BossService = require(script.Parent.Parent.Combat.BossService)
+
 local StageBuilder = {}
+
+export type BossSpec = BossService.BossSpec
 
 export type PartSpec = {
 	name: string?,
@@ -72,6 +77,27 @@ export type GateSpec = {
 	openBy: { kind: "Enemies" | "Sockets", group: string },
 }
 
+--- A magnet wall that moves, pulses its polarity, or both. Give several the
+--- same `period` and different `phase` values to compose a rhythm — that is how
+--- the timing stages are authored. See MotionService.
+export type KineticSpec = {
+	name: string?,
+	size: Vector3,
+	position: Vector3, -- centre of travel
+	--- Half-amplitude of the oscillation. Omit for a wall that only pulses.
+	travel: Vector3?,
+	period: number, -- seconds for one full cycle
+	phase: number?, -- 0..1 offset into the cycle
+	--- When true the wall's magnetism switches on and off within the cycle.
+	pulses: boolean?,
+	dutyCycle: number?, -- fraction of the cycle spent magnetic (default 0.5)
+	--- Extra offset applied to the polarity window only, so a wall that travels
+	--- *and* pulses can be live during the half of its sweep that matters.
+	pulsePhase: number?,
+	--- Clingable while live. Almost always true for these.
+	surface: boolean?,
+}
+
 export type Layout = {
 	spawn: Vector3,
 	parts: { PartSpec },
@@ -83,6 +109,8 @@ export type Layout = {
 	sockets: { SocketSpec }?,
 	blocks: { BlockSpec }?,
 	gates: { GateSpec }?,
+	kinetics: { KineticSpec }?,
+	boss: BossSpec?,
 	--- Y below which the player is killed. Defaults to 60 studs under spawn.
 	killY: number?,
 }
@@ -92,6 +120,10 @@ export type BuiltStage = {
 	spawnCFrame: CFrame,
 	enemies: { EnemySpec },
 	origin: Vector3,
+	boss: BossSpec?,
+	--- Absolute Y of the kill volume. EnemyService uses it so enemies knocked
+	--- off the stage die instead of falling forever.
+	killY: number,
 }
 
 local STEEL = Color3.fromRGB(122, 132, 143)
@@ -265,6 +297,39 @@ function StageBuilder.Build(definition: Types.StageDefinition, layout: Layout, p
 		}, origin, puzzleFolder)
 	end
 
+	-- Kinetic walls. Built live (magnetic) and tagged Kinetic; MotionService
+	-- takes over the movement and polarity from there.
+	local kineticFolder = Instance.new("Folder")
+	kineticFolder.Name = "Kinetic"
+	kineticFolder.Parent = model
+
+	for index, spec in layout.kinetics or {} do
+		local tags = { GameConfig.Tags.Kinetic, GameConfig.Tags.Magnetic }
+		if spec.surface ~= false then
+			table.insert(tags, GameConfig.Tags.MagneticSurface)
+		end
+
+		makePart({
+			name = spec.name or `KineticWall_{index}`,
+			size = spec.size,
+			position = spec.position,
+			anchored = true,
+			color = MAGNET_BLUE,
+			material = Enum.Material.Neon,
+			tags = tags,
+			attributes = {
+				StageId = definition.id,
+				Period = spec.period,
+				Phase = spec.phase or 0,
+				Travel = spec.travel or Vector3.zero,
+				Pulses = spec.pulses == true,
+				DutyCycle = spec.dutyCycle or 0.5,
+				PulsePhase = spec.pulsePhase or 0,
+				IsSurface = spec.surface ~= false,
+			},
+		}, origin, kineticFolder)
+	end
+
 	-- Gates: solid until their condition is met.
 	local gateFolder = Instance.new("Folder")
 	gateFolder.Name = "Gates"
@@ -341,6 +406,8 @@ function StageBuilder.Build(definition: Types.StageDefinition, layout: Layout, p
 		spawnCFrame = CFrame.new(origin + layout.spawn),
 		enemies = layout.enemies or {},
 		origin = origin,
+		boss = layout.boss,
+		killY = killY,
 	}
 end
 

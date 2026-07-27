@@ -40,6 +40,9 @@ export type EnemyKind = {
 	size: Vector3,
 	color: Color3,
 	density: number,
+	--- Stationary bodies get no hover AI at all. Boss cores use this: BossService
+	--- owns their position, so an AI fighting it for control would be noise.
+	stationary: boolean?,
 }
 
 local kinds: { [string]: EnemyKind } = {
@@ -73,6 +76,36 @@ local kinds: { [string]: EnemyKind } = {
 		color = Color3.fromRGB(255, 214, 92),
 		density = 0.4,
 	},
+
+	-- Boss cores. Health is high because the damage windows are short, not
+	-- because the fight is a slog — see BossService.
+	-- Core density is load-bearing, not flavour. Mass must stay well under
+	-- MagnetConfig.ImmovableMassThreshold (260) or the magnet would treat an
+	-- exposed core as an anchor and grapple the player to it instead of
+	-- wrenching it loose — which would quietly delete half the boss fight.
+	--   7³ × 0.2 ≈ 69,  8³ × 0.13 ≈ 67
+	CollectorCore = {
+		displayName = "폐기물 수집기",
+		health = 900,
+		speed = 0,
+		aggroRange = 0,
+		contactDamage = 0,
+		size = Vector3.new(7, 7, 7),
+		color = Color3.fromRGB(255, 116, 84),
+		density = 0.2,
+		stationary = true,
+	},
+	FurnaceCore = {
+		displayName = "대자석로",
+		health = 1500,
+		speed = 0,
+		aggroRange = 0,
+		contactDamage = 0,
+		size = Vector3.new(8, 8, 8),
+		color = Color3.fromRGB(140, 108, 255),
+		density = 0.13,
+		stationary = true,
+	},
 }
 
 EnemyService.Kinds = kinds
@@ -86,9 +119,16 @@ type EnemyState = {
 	velocity: LinearVelocity,
 	lastContactAt: number,
 	homePosition: Vector3,
+	stationary: boolean,
+	--- Who last threw this thing. Kept beyond MagneticRegistry's throw window so
+	--- a drone that sails into a pit still credits the player who launched it.
+	lastThrower: Player?,
 }
 
 local enemies: { [BasePart]: EnemyState } = {}
+
+--- Y below which an enemy counts as knocked out of the world, per stage.
+local voidY: { [string]: number } = {}
 
 EnemyService.EnemyDied = Signal.new() -- (part, stageId, group, killer)
 EnemyService.GroupCleared = Signal.new() -- (stageId, group)
@@ -159,6 +199,8 @@ function EnemyService.Spawn(kindName: string, position: Vector3, stageId: string
 		velocity = velocity,
 		lastContactAt = 0,
 		homePosition = position,
+		stationary = kind.stationary == true,
+		lastThrower = nil,
 	}
 
 	return part
@@ -168,9 +210,21 @@ function EnemyService.IsEnemy(part: Instance?): boolean
 	return part ~= nil and enemies[part :: BasePart] ~= nil
 end
 
+--- Registered by StageService from each layout's kill height, so "밀어서
+--- 떨어뜨리기" is a real way to kill things and not just a way to lose them.
+function EnemyService.SetStageVoidY(stageId: string, y: number)
+	voidY[stageId] = y
+end
+
 function EnemyService.Damage(part: BasePart, amount: number, killer: Player?)
 	local state = enemies[part]
 	if not state or amount <= 0 then
+		return
+	end
+
+	-- Armoured bosses shrug everything off until their window opens. Checked
+	-- here rather than at each call site so no damage source can forget.
+	if part:GetAttribute("Invulnerable") == true then
 		return
 	end
 
@@ -197,6 +251,17 @@ function EnemyService.Damage(part: BasePart, amount: number, killer: Player?)
 
 	if countGroup(stageId, group) == 0 then
 		EnemyService.GroupCleared:Fire(stageId, group)
+	end
+end
+
+--- Removes a group without firing death signals — used to clear a defeated
+--- boss's escorts, which should vanish rather than count as kills.
+function EnemyService.ClearGroup(stageId: string, group: string)
+	for part, state in enemies do
+		if state.stageId == stageId and state.group == group then
+			enemies[part] = nil
+			part:Destroy()
+		end
 	end
 end
 
@@ -242,8 +307,22 @@ local function stepAi()
 			continue
 		end
 
+		-- Knocked out of the world. Credited to whoever launched it, which is
+		-- the entire point of the "knock them into the pit" stages.
+		local floor = voidY[state.stageId]
+		if floor and part.Position.Y < floor then
+			EnemyService.Damage(part, (part:GetAttribute("Health") or 1) + 1, state.lastThrower)
+			continue
+		end
+
+		if state.stationary then
+			state.velocity.Enabled = false
+			continue
+		end
+
 		-- Airborne from a magnet hit: hands off, let physics carry it.
 		if MagneticRegistry.IsThrown(part) then
+			state.lastThrower = MagneticRegistry.Thrower(part) or state.lastThrower
 			state.velocity.VectorVelocity = Vector3.zero
 			state.velocity.Enabled = false
 			continue

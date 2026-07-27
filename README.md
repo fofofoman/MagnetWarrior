@@ -73,14 +73,16 @@ src/
 │   │   └── LeaderboardService.luau OrderedDataStore — 친구 지금, 글로벌 나중
 │   ├── Combat/
 │   │   ├── EnemyService.luau       자석으로 잡히는 부유 드론
-│   │   └── CombatService.luau      충돌 속도 기반 데미지
+│   │   ├── CombatService.luau      충돌 속도 기반 데미지
+│   │   └── BossService.luau        장갑 개폐 패턴, 스크랩 투척, 증원
 │   ├── Stage/
 │   │   ├── StageService.luau       월드 구축, 스테이지 선택, 해금 판정
 │   │   ├── StageBuilder.luau       데이터 → 지오메트리
 │   │   ├── PuzzleService.luau      철제 블록 조립
+│   │   ├── MotionService.luau      움직이는 벽 + 극성 전환
 │   │   ├── GateService.luau        적 전멸/퍼즐 완성 → 문 열림
 │   │   ├── HazardService.luau      낙사·위험지대
-│   │   └── Layouts/                스테이지별 레이아웃 데이터
+│   │   └── Layouts/                스테이지 10개의 레이아웃 데이터
 │   └── Monetization/
 │       ├── MonetizationService.luau  MarketplaceService 연동, 영수증 처리
 │       └── Entitlements.luau         보유 여부 질의의 단일 창구
@@ -108,30 +110,37 @@ src/
 | --- | --- | --- |
 | 1 | 자석 Pull/Push 코어 메카닉 프로토타입 | **완료** — 그래플, 벽 타기, 밀어내기, 물체 조작 |
 | 2 | 서버 사이드 타이머/랭킹 시스템 뼈대 | **완료** — 서버 타이머, 이동 감사, 개인기록, 친구 랭킹 |
-| 3 | 전투/퍼즐 스테이지 추가 | **부분 완료** — 4개 제작 (1·2·3·6), 나머지 8개는 로스터에만 등록 |
+| 3 | 전투/퍼즐 스테이지 추가 | **완료** |
 | 4 | 메달 UI + 개인/친구 랭킹판 | **완료** — 페이스 표시 HUD, 결과 카드, 3탭 랭킹판 |
-| 5 | 나머지 스테이지 제작 | 미착수 — `Layouts/`에 파일 추가 후 `StageService`에 등록하면 됨 |
-| 6 | 보스전 2개 | 미착수 |
+| 5 | 나머지 스테이지 제작 | **완료** — 본편 10개 전부 플레이 가능 |
+| 6 | 보스전 2개 | **완료** — 장갑 개폐 패턴, 스크랩 되받아치기, 증원 |
 | 7 | 게임패스/개발자 상품 연동 | **완료** — 자산 ID만 입력하면 동작 |
 | 8 | 폴리싱 | 미착수 — 사운드 없음, 이펙트는 최소 수준 |
 
-### 제작된 스테이지
+### 스테이지
+
+본편 10개는 전부 플레이 가능하다. 11·12번은 기획서상 "확장 여유분"이므로 기준시간과 해금
+순서만 잡아두고 지오메트리는 비워 두었다 (`hasLayout = false` → 랭킹판에 "준비 중"으로 뜨고
+서버가 이동 요청을 거부한다).
 
 | ID | 이름 | 가르치는 것 |
 | --- | --- | --- |
 | `stage_01_pull` | 인력 시험장 | Pull 전용. 그래플로 협곡 건너기 + 블록 1개 조립 |
 | `stage_02_push` | 척력 시험장 | Push 전용. 벽 반작용(수평 ~36칸) / 바닥 반작용(수직 ~29칸) |
-| `stage_03_scrapyard` | 고철 처리장 | Pull+Push 전투. 3개 아레나, 벽에 처박기 |
+| `stage_03_scrapyard` | 고철 처리장 | 전투 입문. 3개 아레나, 벽에 처박기 |
+| `stage_04_crossfire` | 교차 사격장 | 적을 적에게 던지기. 고철을 일부러 줄여 놓았다 |
+| `stage_05_gauntlet` | 자기장 회랑 | 이동+전투 동시. 좁은 통로에서 적을 낙사시키기 |
 | `stage_06_assembly` | 조립 구역 | 철제 블록 다리 + 계단 조립 |
-
-나머지 8개는 `StageConfig`에 기준시간·해금 순서까지 정의되어 있고 `hasLayout = false`로
-표시되어 있다. 랭킹판에는 "준비 중"으로 뜨고 서버는 이동 요청을 거부한다.
+| `stage_07_cadence` | 박자 실험실 | 극성이 바뀌는 벽, 움직이는 벽 타기 |
+| `stage_08_foundry` | 주조 공장 | 조립과 타이밍 교대. 리프트를 타고 블록 회수 |
+| `stage_09_miniboss` | 폐기물 수집기 | 장갑이 열린 순간에만 통하는 자석 |
+| `stage_10_finalboss` | 대자석로 | 이동·퍼즐·전투 전부 + 증원 + 움직이는 엄폐물 |
 
 ### 스테이지 추가하는 법
 
 1. `src/server/Stage/Layouts/StageNN.luau`에 레이아웃 데이터 작성
-   (`StageBuilder.Layout` 타입 참고 — parts / magnetic / blocks / sockets / gates /
-   enemies / checkpoints)
+   (`StageBuilder.Layout` 타입 참고 — parts / magnetic / kinetics / blocks /
+   sockets / gates / enemies / boss / checkpoints)
 2. `StageConfig`에서 해당 스테이지의 `hasLayout = true`로 변경
 3. `StageService`의 `layouts` 테이블에 `require` 추가
 
@@ -152,5 +161,9 @@ src/
 - **글로벌 Top 10은 읽기 경로만 잠겨 있다.** 쓰기는 지금부터 동작하므로, 플래그를 켜는 시점에
   이미 데이터가 쌓여 있다.
 - **사운드가 전혀 없다.** 8단계 폴리싱 작업.
+- **보스의 "코어 뽑기" 판정은 Studio에서 한 번 맞춰봐야 한다.** `BossService`의
+  `YANK_DISTANCE`는 AlignPosition 스프링이 실제로 얼마나 늘어나는지에 달려 있어서 코드만으로는
+  확정할 수 없다. 스크랩을 되받아쳐서 넣는 쪽이 주된 damage 경로이므로 이 값이 어긋나도 보스를
+  못 잡지는 않는다.
 - **스테이지는 서버 전체가 공유한다.** 같은 스테이지를 아무도 달리고 있지 않을 때 퍼즐·적·문이
   초기화된다. 완전한 인스턴싱이 필요해지면 `StageService.ResetStage`가 시작점이다.

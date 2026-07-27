@@ -28,6 +28,7 @@ local RateLimiter = require(Shared.Util.RateLimiter)
 local StageConfig = require(Shared.Config.StageConfig)
 local Types = require(Shared.Types)
 
+local BossService = require(script.Parent.Parent.Combat.BossService)
 local DataService = require(script.Parent.Parent.Data.DataService)
 local EnemyService = require(script.Parent.Parent.Combat.EnemyService)
 local GateService = require(script.Parent.GateService)
@@ -44,7 +45,13 @@ local layouts: { [string]: StageBuilder.Layout } = {
 	stage_01_pull = require(script.Parent.Layouts.Stage01Pull),
 	stage_02_push = require(script.Parent.Layouts.Stage02Push),
 	stage_03_scrapyard = require(script.Parent.Layouts.Stage03Scrapyard),
+	stage_04_crossfire = require(script.Parent.Layouts.Stage04Crossfire),
+	stage_05_gauntlet = require(script.Parent.Layouts.Stage05Gauntlet),
 	stage_06_assembly = require(script.Parent.Layouts.Stage06Assembly),
+	stage_07_cadence = require(script.Parent.Layouts.Stage07Cadence),
+	stage_08_foundry = require(script.Parent.Layouts.Stage08Foundry),
+	stage_09_miniboss = require(script.Parent.Layouts.Stage09Miniboss),
+	stage_10_finalboss = require(script.Parent.Layouts.Stage10FinalBoss),
 }
 
 local built: { [string]: StageBuilder.BuiltStage } = {}
@@ -156,6 +163,7 @@ function StageService.ResetStage(stageId: string)
 	PuzzleService.ResetStage(stageId)
 	GateService.CloseStage(stageId)
 	spawnStageEnemies(stageId)
+	BossService.ResetStage(stageId)
 end
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -275,14 +283,21 @@ function StageService.Start()
 		local ok, result = pcall(StageBuilder.Build, definition, layout, stages)
 		if ok then
 			built[definition.id] = result
+			-- Anything knocked below the stage dies rather than falling forever.
+			EnemyService.SetStageVoidY(definition.id, result.killY)
+			if result.boss then
+				BossService.Register(definition.id, result.boss, result.origin)
+			end
 		else
 			warn(`[StageService] failed to build {definition.id}: {result}`)
 		end
 	end
 
-	-- Enemies exist as soon as the world does, not only after someone runs.
+	-- Enemies and bosses exist as soon as the world does, not only after
+	-- someone starts a run.
 	for stageId in built do
 		spawnStageEnemies(stageId)
+		BossService.ResetStage(stageId)
 	end
 
 	-- Reset a stage when a run starts on it and nobody else is mid-run there.

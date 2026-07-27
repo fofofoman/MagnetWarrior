@@ -36,6 +36,8 @@ GameConfig.Tags = {
 	PuzzleBlock = "PuzzleBlock",
 	PuzzleSocket = "PuzzleSocket",
 	Gate = "Gate",
+	--- Walls that move, or whose magnetism pulses on a cycle. See MotionService.
+	Kinetic = "Kinetic",
 	Hazard = "Hazard",
 	StageStart = "StageStart",
 	StageFinish = "StageFinish",
