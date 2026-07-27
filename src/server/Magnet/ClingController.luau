@@ -217,8 +217,19 @@ function ClingController.Release(player: Player, launch: boolean)
 
 	if launch and state.root and state.root.Parent then
 		local worldNormal = state.surface.CFrame:VectorToWorldSpace(state.localNormal)
-		state.root.AssemblyLinearVelocity = worldNormal * MagnetConfig.ClingReleaseImpulse
-			+ Vector3.new(0, MagnetConfig.ClingReleaseImpulse * 0.35, 0)
+		local direction = (worldNormal + Vector3.new(0, 0.35, 0)).Unit
+
+		-- Same rule as a push-off: a launch carries the speed you arrived with
+		-- rather than resetting it, so riding a ferry into a wall kick is worth
+		-- more than kicking off from a standstill.
+		local speed = MagnetConfig.ChainSpeed(
+			state.root.AssemblyLinearVelocity,
+			direction,
+			MagnetConfig.ClingReleaseImpulse,
+			MagnetConfig.ClingLaunchChainBonus
+		)
+
+		state.root.AssemblyLinearVelocity = direction * speed
 	end
 
 	ClingController.Released:Fire(player, launch)

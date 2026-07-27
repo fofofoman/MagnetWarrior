@@ -122,7 +122,9 @@ local function buildHub(parent: Instance)
 	practiceCrate.Anchored = false
 	practiceCrate.Color = StageBuilder.Palette.MagnetRed
 	practiceCrate.Material = Enum.Material.DiamondPlate
-	practiceCrate.CustomPhysicalProperties = PhysicalProperties.new(0.6, 0.5, 0.2, 1, 1)
+	-- Matches the crates in the stages, so what the hub teaches is what the
+	-- stages do.
+	practiceCrate.CustomPhysicalProperties = PhysicalProperties.new(0.22, 0.5, 0.2, 1, 1)
 	practiceCrate.Parent = hub
 
 	-- The hub has edges too; falling off it should reset you, not drop you

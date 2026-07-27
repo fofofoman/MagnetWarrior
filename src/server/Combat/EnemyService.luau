@@ -28,6 +28,14 @@ local MagneticRegistry = require(script.Parent.Parent.Magnet.MagneticRegistry)
 
 local EnemyService = {}
 
+--- Damage readability. A drone with no health bar still has to communicate how
+--- close it is to dying, so it flashes white on every hit and then settles to a
+--- colour lerped toward FADED by how hurt it is. You can read a whole arena's
+--- state at a glance without a single piece of UI.
+local HIT_FLASH = Color3.fromRGB(255, 255, 255)
+local HIT_FLASH_SECONDS = 0.07
+local FADED = Color3.fromRGB(38, 30, 34)
+
 local AI_RATE = 15 -- Hz
 local HOVER_HEIGHT = 5 -- studs above the ground the drone tries to hold
 local CONTACT_RANGE = 6.5
@@ -66,7 +74,11 @@ local kinds: { [string]: EnemyKind } = {
 		contactDamage = 22,
 		size = Vector3.new(6, 6, 6),
 		color = Color3.fromRGB(196, 112, 42),
-		density = 0.9,
+		-- Mass 108. Heavy enough that slamming it into a wall barely scratches
+		-- it (17 damage against 150 health), light enough that the magnet can
+		-- still pick it up and throw it. That combination is its whole role: the
+		-- Hauler is not something you slam, it is something you slam *with*.
+		density = 0.5,
 	},
 	Spark = {
 		displayName = "스파크",
@@ -192,6 +204,8 @@ function EnemyService.Spawn(kindName: string, position: Vector3, stageId: string
 	CollectionService:AddTag(part, GameConfig.Tags.Enemy)
 	CollectionService:AddTag(part, GameConfig.Tags.Magnetic)
 
+	part.Color = kind.color
+
 	enemies[part] = {
 		part = part,
 		kind = kind,
@@ -236,6 +250,15 @@ function EnemyService.Damage(part: BasePart, amount: number, killer: Player?, si
 	part:SetAttribute("Health", math.max(health, 0))
 
 	if health > 0 then
+		local ratio = math.clamp(health / math.max(state.kind.health, 1), 0, 1)
+		local settled = state.kind.color:Lerp(FADED, (1 - ratio) * 0.75)
+
+		part.Color = HIT_FLASH
+		task.delay(HIT_FLASH_SECONDS, function()
+			if part.Parent then
+				part.Color = settled
+			end
+		end)
 		return
 	end
 
@@ -374,6 +397,7 @@ local function stepAi()
 			local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 			if humanoid then
 				humanoid:TakeDamage(state.kind.contactDamage)
+				SoundKit.PlayAt("PlayerHurt", position)
 			end
 		end
 	end

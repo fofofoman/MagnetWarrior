@@ -58,7 +58,7 @@ do
 		size = Vector3.new(6, 6, 6),
 		position = position,
 		anchored = false,
-		density = 0.6,
+		density = 0.22,
 		material = Enum.Material.CorrodedMetal,
 		color = Color3.fromRGB(146, 118, 92),
 	})

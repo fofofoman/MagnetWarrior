@@ -65,7 +65,7 @@ do
 		size = spec.size,
 		position = spec.position,
 		anchored = false,
-		density = 0.6,
+		density = 0.22,
 		material = Enum.Material.CorrodedMetal,
 		color = Color3.fromRGB(146, 118, 92),
 	})

@@ -10,6 +10,12 @@
 	medal still reachable *right now*, downgrading live as the clock passes each
 	one. Because the thresholds are shared config, the chip and the server's
 	award can never disagree.
+
+	Once every medal is out of reach it switches to the player's own personal
+	best instead of announcing failure. Telling someone mid-run that they have
+	already lost is the fastest way to make them stop running; a live gap to
+	their own record is something they can still act on, and for a player with no
+	medal yet it is the only goal that exists.
 ]]
 
 local Players = game:GetService("Players")
@@ -18,9 +24,11 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Net = require(Shared.Net)
 local StageConfig = require(Shared.Config.StageConfig)
 local TimeFormat = require(Shared.Util.TimeFormat)
 
+local MagnetEffects = require(script.Parent.Parent.Effects.MagnetEffects)
 local MagnetController = require(script.Parent.Parent.MagnetController)
 local RunState = require(script.Parent.Parent.State.RunState)
 local Theme = require(script.Parent.Theme)
@@ -39,8 +47,17 @@ local stageLabel: TextLabel
 local pullBar: Frame
 local pushBar: Frame
 local runFrame: Frame
+local crosshair: Frame
 
---- Best medal still achievable at this elapsed time.
+--- Personal bests, so the pace chip has something to fall back on. Refreshed on
+--- start and after every finish.
+local records: { [string]: any } = {}
+
+local CROSSHAIR_BASE = 6
+local CROSSHAIR_SPREAD = 10 -- extra pixels at full speed
+
+--- Best medal still achievable at this elapsed time, or — once they are all
+--- gone — the live gap to the player's own record.
 local function paceFor(stageId: string?, elapsedMs: number): (string, Color3)
 	local definition = stageId and StageConfig.Get(stageId)
 	if not definition then
@@ -54,7 +71,28 @@ local function paceFor(stageId: string?, elapsedMs: number): (string, Color3)
 	elseif elapsedMs <= definition.medals.Bronze then
 		return `브론즈 페이스 · {TimeFormat.Short(definition.medals.Bronze - elapsedMs)} 남음`, Theme.Medal.Bronze
 	end
-	return "메달 획득 실패", Theme.Medal.None
+
+	local record = records[stageId]
+	local best = record and record.bestTimeMs
+	if typeof(best) == "number" and best > 0 then
+		if elapsedMs < best then
+			return `개인기록까지 {TimeFormat.Short(best - elapsedMs)} 남음`, Theme.Colors.Good
+		end
+		return `개인기록 {TimeFormat.Delta(elapsedMs - best)}`, Theme.Colors.TextDim
+	end
+
+	return "완주 목표", Theme.Colors.TextDim
+end
+
+local function refreshRecords()
+	task.spawn(function()
+		local ok, result = pcall(function()
+			return Net.GetRecords:InvokeServer()
+		end)
+		if ok and typeof(result) == "table" then
+			records = result
+		end
+	end)
 end
 
 local function buildGui()
@@ -68,11 +106,11 @@ local function buildGui()
 
 	-- Crosshair. The magnet aims from the head toward this point, so it needs to
 	-- be exactly centred.
-	create("Frame", {
+	crosshair = create("Frame", {
 		Name = "Crosshair",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromOffset(6, 6),
+		Size = UDim2.fromOffset(CROSSHAIR_BASE, CROSSHAIR_BASE),
 		BackgroundColor3 = Theme.Colors.Text,
 		BackgroundTransparency = 0.3,
 		BorderSizePixel = 0,
@@ -245,6 +283,8 @@ local function onRunUpdate(update)
 		if update.rejected then
 			flashSplit(`기록 무효 · {update.rejectReason or "검증 실패"}`, Theme.Colors.Bad)
 		end
+		-- A new personal best changes what the pace chip should aim at next run.
+		refreshRecords()
 	end
 end
 
@@ -253,9 +293,17 @@ function Hud.Start()
 
 	RunState.Changed:Connect(onRunUpdate)
 
+	refreshRecords()
+
 	RunService.RenderStepped:Connect(function()
 		pullBar.Size = UDim2.fromScale(1 - MagnetController.CooldownAlpha("Pull"), 1)
 		pushBar.Size = UDim2.fromScale(1 - MagnetController.CooldownAlpha("Push"), 1)
+
+		-- The crosshair opens up with speed. It carries no mechanical meaning —
+		-- aim assist is server-side and unchanged — but it puts the speed cue in
+		-- the one place the player is already looking.
+		local spread = CROSSHAIR_BASE + CROSSHAIR_SPREAD * MagnetEffects.SpeedAlpha()
+		crosshair.Size = UDim2.fromOffset(spread, spread)
 
 		if not RunState.IsActive() then
 			return

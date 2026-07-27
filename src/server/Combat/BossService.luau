@@ -44,6 +44,13 @@ local BossService = {}
 
 local TICK_RATE = 15 -- Hz
 local ARMOR_SLIDE_TIME = 0.5
+
+--- How long before the plates open that they start glowing. A boss whose only
+--- damage window arrives without warning is a memory test; a telegraphed one is
+--- a pattern you can play around, which is what "패턴을 읽어라" asks for.
+local TELEGRAPH_SECONDS = 1.25
+local TELEGRAPH_COLOR = Color3.fromRGB(255, 168, 72)
+local PLATE_COLOR = Color3.fromRGB(96, 104, 118)
 --- MaxForce has to exceed the core's weight or it simply falls out of its
 --- cradle (mass ~68 × gravity 145 ≈ 9900). Responsiveness is what actually
 --- governs how far a Pull can drag it: it sets the stiffness of the spring, and
@@ -216,7 +223,10 @@ local function throwScrap(state: BossState)
 	scrap.CFrame = CFrame.new(muzzle)
 	scrap.Color = Color3.fromRGB(168, 128, 96)
 	scrap.Material = Enum.Material.CorrodedMetal
-	scrap.CustomPhysicalProperties = PhysicalProperties.new(0.6, 0.5, 0.2, 1, 1)
+	-- Same density as loose scrap elsewhere. It has to be light enough that one
+	-- Push sends it back hard enough to hurt the core — that deflection *is* the
+	-- fight, and a heavy projectile would quietly make it impossible.
+	scrap.CustomPhysicalProperties = PhysicalProperties.new(0.22, 0.5, 0.2, 1, 1)
 	scrap.Parent = workspace:FindFirstChild("Enemies") or workspace
 
 	-- Tag after parenting: MagneticRegistry claims server ownership on tag, and
@@ -246,6 +256,7 @@ local function throwScrap(state: BossState)
 		local humanoid = playerHumanoidOf(other)
 		if humanoid and humanoid.Health > 0 then
 			humanoid:TakeDamage(SCRAP_DAMAGE)
+			SoundKit.PlayAt("PlayerHurt", scrap.Position)
 			connection:Disconnect()
 			scrap:Destroy()
 		end
@@ -376,6 +387,20 @@ local function step()
 		if not core.Parent or not state.alive then
 			despawn(key)
 			continue
+		end
+
+		-- Telegraph: while sealed, the plates heat up over the last moment before
+		-- they retract.
+		if not state.open then
+			local remaining = state.phaseUntil - now
+			local heat = 1 - math.clamp(remaining / TELEGRAPH_SECONDS, 0, 1)
+			local tint = PLATE_COLOR:Lerp(TELEGRAPH_COLOR, heat)
+			for _, plate in state.plates do
+				if plate.Parent then
+					plate.Color = tint
+					plate.Material = if heat > 0.5 then Enum.Material.Neon else Enum.Material.Metal
+				end
+			end
 		end
 
 		-- Armour cycle.

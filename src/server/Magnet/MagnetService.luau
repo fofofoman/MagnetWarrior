@@ -260,6 +260,9 @@ local function applyToObject(
 			return
 		end
 
+		-- Proportional: fast when far, easing to almost nothing on arrival. The
+		-- easing is what makes placing a slab on a socket a controllable act
+		-- rather than a series of overshoots.
 		local speed = math.clamp(
 			holdDistance * MagnetConfig.PullTargetGain,
 			MagnetConfig.PullTargetMinSpeed,
@@ -358,17 +361,36 @@ local function stepGrapples()
 			continue
 		end
 
-		state.velocity.VectorVelocity = delta.Unit * MagnetConfig.SelfPullSpeed
+		-- Accelerate along the line instead of running at a fixed speed: a long
+		-- grapple should pay out real velocity, and that velocity survives the
+		-- release, so grapple → push is the fastest thing a player can do.
+		local held = os.clock() - state.startedAt
+		local ramp = math.clamp(held / MagnetConfig.SelfPullRampSeconds, 0, 1)
+		local speed = MagnetConfig.SelfPullSpeed
+			+ (MagnetConfig.SelfPullMaxSpeed - MagnetConfig.SelfPullSpeed) * ramp
+
+		state.velocity.VectorVelocity = delta.Unit * speed
 		hooks.NoteBoost(player, "grapple")
 	end
 end
 
+--- Overwriting velocity outright — which is what this used to do — meant a
+--- player already travelling at 90 got 92 out of a perfectly chained push, so
+--- chaining was worth nothing and every launch felt identical. Carrying the
+--- component already going that way makes a well-aimed chain genuinely faster.
 local function pushSelfOff(player: Player, root: BasePart, hitPosition: Vector3)
 	local away = root.Position - hitPosition
 	local direction = if away.Magnitude > 0.1 then away.Unit else Vector3.yAxis
 	local biased = (direction + Vector3.new(0, MagnetConfig.SelfPushUpBias, 0)).Unit
 
-	root.AssemblyLinearVelocity = biased * MagnetConfig.SelfPushSpeed
+	local speed = MagnetConfig.ChainSpeed(
+		root.AssemblyLinearVelocity,
+		biased,
+		MagnetConfig.SelfPushSpeed,
+		MagnetConfig.PushChainBonus
+	)
+
+	root.AssemblyLinearVelocity = biased * speed
 	hooks.NoteBoost(player, "pushoff")
 end
 
@@ -473,6 +495,8 @@ local function onMagnetAction(player: Player, payload: any)
 
 	local target, hitPosition, _normal = resolveTarget(character, origin, direction)
 	if not target or not hitPosition then
+		-- A whiff is cheap. Only a connection costs the full cooldown.
+		playerCooldowns[action] = now + MagnetConfig.MissCooldown
 		feedback(player, action, "NoTarget")
 		return
 	end

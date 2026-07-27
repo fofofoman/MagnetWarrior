@@ -125,15 +125,16 @@ local function onTouched(mover: BasePart, other: BasePart)
 		return
 	end
 
-	local victimPlayer, victimHumanoid = characterOf(other)
+	-- Players are never hurt by thrown objects — their own or anyone else's.
+	--
+	-- There is no PvP mode here, stages are shared world space, and a stray crate
+	-- from a stranger two platforms away could end a run someone had been
+	-- grinding for an hour. That is a griefing vector with no design upside, and
+	-- removing it is also what lets impact damage be tuned hard enough for the
+	-- combat stages to work. The player's real threats are enemy contact, boss
+	-- scrap (BossService handles that directly), hazards and falls.
+	local _victimPlayer, victimHumanoid = characterOf(other)
 	if victimHumanoid then
-		-- You cannot hurt yourself with your own throw; magnet traversal
-		-- constantly puts objects near the thrower.
-		if victimPlayer ~= thrower and MagneticRegistry.TryConsumeDamageWindow(mover, other) then
-			victimHumanoid:TakeDamage(damage)
-			SoundKit.PlayAt("PlayerHurt", contact)
-			announceImpact("PlayerHurt", contact, damage)
-		end
 		return
 	end
 

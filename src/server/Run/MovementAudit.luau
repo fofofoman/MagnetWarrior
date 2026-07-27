@@ -46,7 +46,14 @@ local TELEPORT_DISTANCE = 55 -- studs
 local SAMPLE_TOLERANCE = 4 -- studs
 
 --- How long a server-applied force keeps the caps raised.
-local BOOST_WINDOW = 1.2 -- seconds
+---
+--- This has to outlast the *flight* a legal launch produces, not just the
+--- instant it is applied. A chained push at MagnetConfig.ChainedSpeedCap off a
+--- high ledge stays fast for the whole fall — around two seconds on the tallest
+--- stage — and a window that expires mid-flight would flag the player for
+--- movement the server itself granted. Raising the launch speeds means raising
+--- this too.
+local BOOST_WINDOW = 2.5 -- seconds
 
 --- Soft violations tolerated before a run is thrown out.
 local MAX_SOFT_VIOLATIONS = 6

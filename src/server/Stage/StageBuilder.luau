@@ -271,7 +271,11 @@ function StageBuilder.Build(definition: Types.StageDefinition, layout: Layout, p
 			anchored = false,
 			color = MAGNET_RED,
 			material = Enum.Material.DiamondPlate,
-			density = 0.6,
+			-- A 10×2×12 slab at 0.25 is mass 60, which one Pull can move about
+			-- 46 studs/s. Heavier than that and dragging a slab to its socket
+			-- took so many pulls that the assembly stages stopped being puzzles
+			-- and started being chores.
+			density = 0.25,
 			tags = { GameConfig.Tags.Magnetic, GameConfig.Tags.PuzzleBlock },
 			attributes = { StageId = definition.id, PuzzleGroup = spec.group },
 		}, origin, puzzleFolder)

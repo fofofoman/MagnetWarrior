@@ -18,6 +18,7 @@ local RunService = game:GetService("RunService")
 
 local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
 local GameConfig = require(Shared.Config.GameConfig)
+local SoundKit = require(Shared.Util.SoundKit)
 
 local HazardService = {}
 
@@ -54,6 +55,7 @@ local function onHazardTouched(other: BasePart)
 	lastHazardHit[humanoid] = now
 
 	humanoid:TakeDamage(HAZARD_DAMAGE)
+	SoundKit.PlayAt("PlayerHurt", other.Position)
 end
 
 local function registerHazard(instance: Instance)

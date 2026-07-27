@@ -32,7 +32,18 @@ local MagnetEffects = {}
 local BEAM_LIFETIME = 0.3
 local TRAIL_SPEED_THRESHOLD = 48 -- studs/s before the trail switches on
 
+--- Speed only feels like speed if the camera says so. Momentum now compounds,
+--- so a chained run reaches roughly 128 studs/s against a 16 walk — without a
+--- cue, that difference reads as "the level got shorter" rather than "I got
+--- fast". This is free and applies to everyone: the trail cosmetic changes what
+--- your speed *looks* like, never whether you can tell you have it.
+local FOV_SPEED_START = 45 -- studs/s where the widening begins
+local FOV_SPEED_FULL = 125 -- studs/s where it maxes out
+local FOV_MAX_KICK = 16 -- degrees
+local FOV_RESPONSE = 6 -- per second, toward the target
+
 local localPlayer = Players.LocalPlayer
+local baseFov: number? = nil
 
 local function beamColorFor(actor: Player, action: string): Color3
 	local name = actor:GetAttribute("BeamColor")
@@ -210,7 +221,39 @@ local function setupTrail(character: Model)
 	end)
 end
 
+--- 0..1 measure of how fast the local character is moving, for effects that
+--- want to scale with speed. Hud uses it for the crosshair.
+local speedAlpha = 0
+
+function MagnetEffects.SpeedAlpha(): number
+	return speedAlpha
+end
+
+local function stepSpeedFeel(deltaTime: number)
+	local camera = workspace.CurrentCamera
+	if not camera then
+		return
+	end
+
+	local character = localPlayer.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	local speed = if root then root.AssemblyLinearVelocity.Magnitude else 0
+
+	speedAlpha = math.clamp((speed - FOV_SPEED_START) / (FOV_SPEED_FULL - FOV_SPEED_START), 0, 1)
+
+	-- Captured lazily so a player who has changed their own FOV keeps it as the
+	-- baseline instead of being snapped to ours.
+	if not baseFov then
+		baseFov = camera.FieldOfView
+	end
+
+	local target = baseFov + FOV_MAX_KICK * speedAlpha
+	camera.FieldOfView += (target - camera.FieldOfView) * math.min(deltaTime * FOV_RESPONSE, 1)
+end
+
 function MagnetEffects.Start()
+	RunService.RenderStepped:Connect(stepSpeedFeel)
+
 	Net.MagnetFeedback.OnClientEvent:Connect(function(payload)
 		local ok, err = pcall(onFeedback, payload)
 		if not ok then
