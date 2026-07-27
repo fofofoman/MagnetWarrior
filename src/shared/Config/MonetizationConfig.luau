@@ -60,7 +60,10 @@ local gamePasses: { Types.ProductDefinition } = {
 		key = "VictoryPosePack",
 		assetId = 0,
 		displayName = "승리 포즈 팩",
-		description = "클리어 연출용 포즈와 이모트를 해금합니다.",
+		-- Says what it actually does. It used to promise "포즈와 이모트", which
+		-- would have needed uploaded animations — and until VictoryPose.luau
+		-- existed it delivered nothing at all.
+		description = "스테이지 클리어 시 재생되는 승리 연출 4종을 해금합니다. 같은 서버의 모두에게 보입니다.",
 		category = "Cosmetic",
 		impact = "None",
 		cosmetic = {
@@ -173,6 +176,46 @@ local cosmeticSlots: { [string]: CosmeticSlot } = {
 }
 
 MonetizationConfig.CosmeticSlots = cosmeticSlots
+
+--- Display names for cosmetic values. The values themselves are internal keys —
+--- they are what the client sends, what the server validates and what gets
+--- written to the profile, so they stay stable English identifiers. Without this
+--- the 외형 tab showed a Korean-speaking player a grid of buttons reading
+--- "Salute", "Crimson", "Magnetite".
+local cosmeticLabels: { [string]: string } = {
+	-- 공통
+	Default = "기본",
+	None = "없음",
+
+	-- 자기장 색상
+	Crimson = "크림슨",
+	Azure = "애저",
+	Toxic = "톡식",
+	Violet = "바이올렛",
+	Solar = "솔라",
+	Frost = "프로스트",
+	Void = "보이드",
+	Chrome = "크롬",
+
+	-- 이동 트레일
+	Sparks = "스파크",
+	Ion = "이온",
+	Magnetite = "마그네타이트",
+	Aurora = "오로라",
+
+	-- 승리 연출
+	Salute = "경례",
+	Hover = "부양",
+	Crush = "압쇄",
+	Polarity = "극성",
+}
+
+MonetizationConfig.CosmeticLabels = cosmeticLabels
+
+--- Falls back to the raw key so a value added without a label still renders.
+function MonetizationConfig.LabelFor(value: string): string
+	return cosmeticLabels[value] or value
+end
 
 --- Slot names in display order.
 function MonetizationConfig.OrderedCosmeticSlots(): { string }

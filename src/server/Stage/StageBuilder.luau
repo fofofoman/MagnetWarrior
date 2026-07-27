@@ -388,10 +388,18 @@ function StageBuilder.Build(definition: Types.StageDefinition, layout: Layout, p
 	})
 
 	-- Kill volume under the stage.
+	--
+	-- Deliberately far larger than any stage's geometry. HazardService only kills
+	-- a player who is below the plane *and* inside its footprint, so anyone who
+	-- clears the edge falls right past it — a chained launch at
+	-- MagnetConfig.ChainedSpeedCap carries about 125 studs during the drop, and
+	-- stage 8 already reaches Z 558 against the old 900-stud plane. Overshooting
+	-- costs nothing: the part is invisible, non-colliding, non-queryable, and
+	-- stages sit 2000 studs apart so neighbouring planes still cannot touch.
 	local killY = layout.killY or (layout.spawn.Y - 90)
 	makePart({
 		name = "KillPlane",
-		size = Vector3.new(900, 4, 900),
+		size = Vector3.new(1600, 4, 1600),
 		position = Vector3.new(0, killY, 200),
 		anchored = true,
 		canCollide = false,

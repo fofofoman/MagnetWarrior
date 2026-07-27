@@ -206,6 +206,7 @@ local function renderCosmetics()
 			local isDefault = value == slot.default
 			local available = isDefault or unlocked
 			local selected = current == value
+			local label = MonetizationConfig.LabelFor(value)
 
 			local button = create("TextButton", {
 				LayoutOrder = index,
@@ -216,7 +217,7 @@ local function renderCosmetics()
 				BackgroundTransparency = if available then 0 else 0.4,
 				BorderSizePixel = 0,
 				Font = Theme.Font,
-				Text = if available then value else `{value} 🔒`,
+				Text = if available then label else `{label} 🔒`,
 				TextColor3 = if selected
 					then Theme.Colors.Background
 					elseif available then Theme.Colors.Text
@@ -226,6 +227,27 @@ local function renderCosmetics()
 			})
 			create("UICorner", { CornerRadius = UDim.new(0, 6), Parent = button })
 			Theme.clickable(button)
+
+			-- Colour swatches show their colour. A grid of identically grey
+			-- buttons reading "크림슨" and "애저" asks the player to buy a colour
+			-- pack without ever showing them a colour.
+			local swatch = Theme.BeamColors[value]
+			if slotName == "beamColor" and swatch then
+				create("Frame", {
+					Name = "Swatch",
+					AnchorPoint = Vector2.new(0, 0.5),
+					Position = UDim2.new(0, 8, 0.5, 0),
+					Size = UDim2.fromOffset(10, 10),
+					BackgroundColor3 = swatch,
+					BackgroundTransparency = if available then 0 else 0.55,
+					BorderSizePixel = 0,
+					Parent = button,
+				}, {
+					create("UICorner", { CornerRadius = UDim.new(1, 0) }),
+				})
+				-- Nudge the label clear of the swatch.
+				button.Text = ` {button.Text}`
+			end
 
 			button.Activated:Connect(function()
 				if available then

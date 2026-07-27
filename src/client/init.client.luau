@@ -24,6 +24,7 @@ local RunState = require(script.State.RunState)
 local ShopPanel = require(script.UI.ShopPanel)
 local Toast = require(script.UI.Toast)
 local UiState = require(script.UI.UiState)
+local VictoryPose = require(script.Effects.VictoryPose)
 
 local player = Players.LocalPlayer
 
@@ -50,6 +51,7 @@ local function main()
 	MagnetEffects.Start()
 	ImpactEffects.Start()
 	GhostPlayer.Start()
+	VictoryPose.Start()
 	AudioController.Start()
 
 	Toast.Start()

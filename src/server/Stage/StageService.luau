@@ -132,7 +132,8 @@ local function buildHub(parent: Instance)
 	-- through the world forever.
 	local killPlane = Instance.new("Part")
 	killPlane.Name = "HubKillPlane"
-	killPlane.Size = Vector3.new(900, 4, 900)
+	-- Same generosity as the stage planes; see StageBuilder.
+	killPlane.Size = Vector3.new(1600, 4, 1600)
 	killPlane.Position = Vector3.new(HUB_ORIGIN_X, -60, 0)
 	killPlane.Anchored = true
 	killPlane.CanCollide = false

@@ -105,6 +105,7 @@ src/
     ├── Effects/
     │   ├── MagnetEffects.luau  빔, 트레일
     │   ├── ImpactEffects.luau  충돌 파티클, 화면 흔들림
+    │   ├── VictoryPose.luau    클리어 승리 연출 4종
     │   └── GhostPlayer.luau    고스트 실루엣 재생
     └── UI/
         ├── Hud.luau            타이머, 메달 페이스, 쿨다운, 조작 힌트

@@ -135,6 +135,9 @@ type EnemyState = {
 	lastContactAt: number,
 	homePosition: Vector3,
 	stationary: boolean,
+	--- Anchored because its stage is asleep. Tracked so the anchor is written
+	--- once on each transition rather than every tick.
+	parked: boolean,
 	--- Who last threw this thing. Kept beyond MagneticRegistry's throw window so
 	--- a drone that sails into a pit still credits the player who launched it.
 	lastThrower: Player?,
@@ -213,6 +216,7 @@ function EnemyService.Spawn(kindName: string, position: Vector3, stageId: string
 		lastContactAt = 0,
 		homePosition = position,
 		stationary = kind.stationary == true,
+		parked = false,
 		lastThrower = nil,
 	}
 
@@ -341,11 +345,32 @@ local function stepAi()
 			continue
 		end
 
-		-- Nobody near this stage: no chasing, no hovering, no raycasts. The drone
-		-- keeps its position and picks up where it left off when someone arrives.
+		-- Nobody near this stage: no chasing, no hovering, no raycasts.
+		--
+		-- Anchored, not merely un-driven. Switching the hover off leaves an
+		-- unanchored drone to gravity, and Roblox keeps simulating it whether or
+		-- not anyone is watching — so every drone in every unattended stage sank
+		-- to the floor, and any spawned over a pit fell past
+		-- FallenPartsDestroyHeight and was deleted outright. Arriving at an arena
+		-- that had quietly emptied itself is not what sleeping a stage was
+		-- supposed to mean.
+		--
+		-- Boss cores are exempt: their position is owned by BossService's
+		-- AlignPosition, which holds them without any help from here.
 		if not StageActivity.IsAwake(state.stageId) then
 			state.velocity.Enabled = false
+			if not state.parked and not state.stationary then
+				state.parked = true
+				part.AssemblyLinearVelocity = Vector3.zero
+				part.AssemblyAngularVelocity = Vector3.zero
+				part.Anchored = true
+			end
 			continue
+		end
+
+		if state.parked then
+			state.parked = false
+			part.Anchored = false
 		end
 
 		-- Knocked out of the world. Credited to whoever launched it, which is

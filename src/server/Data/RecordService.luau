@@ -84,6 +84,23 @@ local function sendFinished(
 		checkpointTotal = splitCount,
 	}
 	Net.RunUpdate:FireClient(player, update)
+
+	-- Victory pose. Broadcast rather than sent to the finisher alone: it is a
+	-- cosmetic, and a cosmetic only the buyer can see is half a product. Which
+	-- pose to draw is not sent — the choice already replicates as the player's
+	-- `Pose` attribute, so every client resolves it locally. Reuses
+	-- CombatFeedback rather than adding a remote; ImpactEffects has no style
+	-- named "VictoryPose" and ignores it.
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if root then
+		Net.CombatFeedback:FireAllClients({
+			kind = "VictoryPose",
+			actor = player,
+			position = root.Position,
+			magnitude = 1,
+		})
+	end
 end
 
 local function onRunFinished(player: Player, result: any)
