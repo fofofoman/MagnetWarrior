@@ -3,10 +3,24 @@
 	StageConfig.luau
 	The full 12-stage roster with medal thresholds.
 
-	`minPossibleMs` is the anti-cheat floor: the fastest a human could physically
-	finish, derived from the stage's critical path length divided by
-	MagnetConfig.MaxLegitimateSpeed. Anything faster did not happen. Keep it
-	comfortably below Gold — it exists to catch teleports, not to punish routing.
+	**These numbers are generated, not hand-picked.** `tools/estimate_medals.py`
+	reads the layout files, measures the route a run has to walk, adds the fixed
+	cost of everything that makes a player stop moving (enemies, sockets, gates,
+	polarity waits, boss armour cycles), and writes the result here. Re-run it
+	after a tuning change rather than guessing:
+
+	    python3 tools/estimate_medals.py            # show the proposed table
+	    python3 tools/estimate_medals.py --apply    # write it here
+
+	Its assumptions are deliberately pessimistic — a medal nobody can earn is a
+	dead goal, while one that is slightly generous still works. Once the game has
+	real players, `MedalCalibration` reports what they actually achieve, which
+	beats any static estimate.
+
+	`minPossibleMs` is the anti-cheat floor: below this, no run happened. It is a
+	fraction of Gold rather than a raw path-length figure, because
+	RunSessionService divides it across the stage's segments — a floor of a few
+	seconds would let a clipped segment through at half a second.
 
 	`hasLayout = false` means the stage is rostered but has no geometry yet; the
 	stage select shows it as coming soon and the server refuses to start it.
@@ -29,8 +43,8 @@ local definitions: { Types.StageDefinition } = {
 		kind = "Tutorial",
 		description = "왼손 Pull만으로 협곡을 건넌다. 철제 발판을 끌어와 발 밑에 깔아라.",
 		allowedActions = { "Pull" },
-		medals = { Gold = seconds(38), Silver = seconds(52), Bronze = seconds(75) },
-		minPossibleMs = seconds(14),
+		medals = { Gold = seconds(32), Silver = seconds(43), Bronze = seconds(61) },
+		minPossibleMs = seconds(11),
 		checkpointCount = 2,
 		originX = 0,
 		hasLayout = true,
@@ -42,8 +56,8 @@ local definitions: { Types.StageDefinition } = {
 		kind = "Tutorial",
 		description = "오른손 Push만 사용한다. 벽을 밀어 그 반작용으로 몸을 띄워라.",
 		allowedActions = { "Push" },
-		medals = { Gold = seconds(42), Silver = seconds(58), Bronze = seconds(82) },
-		minPossibleMs = seconds(16),
+		medals = { Gold = seconds(28), Silver = seconds(38), Bronze = seconds(53) },
+		minPossibleMs = seconds(10),
 		checkpointCount = 2,
 		originX = 2000,
 		hasLayout = true,
@@ -58,8 +72,8 @@ local definitions: { Types.StageDefinition } = {
 		kind = "Combat",
 		description = "끌어당겨 붙잡고, 밀어서 벽에 처박는다. 충돌 속도가 곧 데미지다.",
 		allowedActions = { "Pull", "Push" },
-		medals = { Gold = seconds(55), Silver = seconds(78), Bronze = seconds(110) },
-		minPossibleMs = seconds(22),
+		medals = { Gold = seconds(70), Silver = seconds(94), Bronze = seconds(133) },
+		minPossibleMs = seconds(24),
 		checkpointCount = 3,
 		originX = 4000,
 		hasLayout = true,
@@ -72,8 +86,8 @@ local definitions: { Types.StageDefinition } = {
 		kind = "Combat",
 		description = "다수의 적을 동시에 처리한다. 한 놈을 다른 놈에게 던져라.",
 		allowedActions = { "Pull", "Push" },
-		medals = { Gold = seconds(70), Silver = seconds(95), Bronze = seconds(135) },
-		minPossibleMs = seconds(28),
+		medals = { Gold = seconds(90), Silver = seconds(122), Bronze = seconds(171) },
+		minPossibleMs = seconds(31),
 		checkpointCount = 3,
 		originX = 6000,
 		hasLayout = true,
@@ -86,8 +100,8 @@ local definitions: { Types.StageDefinition } = {
 		kind = "Combat",
 		description = "이동과 전투를 동시에. 벽을 타면서 적을 떨어뜨린다.",
 		allowedActions = { "Pull", "Push" },
-		medals = { Gold = seconds(85), Silver = seconds(115), Bronze = seconds(160) },
-		minPossibleMs = seconds(34),
+		medals = { Gold = seconds(92), Silver = seconds(124), Bronze = seconds(175) },
+		minPossibleMs = seconds(32),
 		checkpointCount = 4,
 		originX = 8000,
 		hasLayout = true,
@@ -102,8 +116,8 @@ local definitions: { Types.StageDefinition } = {
 		kind = "Puzzle",
 		description = "흩어진 철제 블록을 소켓에 맞춰 다리를 완성한다.",
 		allowedActions = { "Pull", "Push" },
-		medals = { Gold = seconds(80), Silver = seconds(110), Bronze = seconds(155) },
-		minPossibleMs = seconds(30),
+		medals = { Gold = seconds(125), Silver = seconds(169), Bronze = seconds(238) },
+		minPossibleMs = seconds(44),
 		checkpointCount = 2,
 		originX = 10000,
 		hasLayout = true,
@@ -116,8 +130,8 @@ local definitions: { Types.StageDefinition } = {
 		kind = "Puzzle",
 		description = "움직이는 자석 벽. 극성이 바뀌는 순간에 맞춰 붙어라.",
 		allowedActions = { "Pull", "Push" },
-		medals = { Gold = seconds(95), Silver = seconds(130), Bronze = seconds(180) },
-		minPossibleMs = seconds(38),
+		medals = { Gold = seconds(54), Silver = seconds(73), Bronze = seconds(103) },
+		minPossibleMs = seconds(19),
 		checkpointCount = 3,
 		originX = 12000,
 		hasLayout = true,
@@ -130,8 +144,8 @@ local definitions: { Types.StageDefinition } = {
 		kind = "Puzzle",
 		description = "조립 퍼즐과 타이밍 퍼즐의 결합. 실수하면 처음부터.",
 		allowedActions = { "Pull", "Push" },
-		medals = { Gold = seconds(120), Silver = seconds(165), Bronze = seconds(230) },
-		minPossibleMs = seconds(46),
+		medals = { Gold = seconds(165), Silver = seconds(223), Bronze = seconds(314) },
+		minPossibleMs = seconds(58),
 		checkpointCount = 4,
 		originX = 14000,
 		hasLayout = true,
@@ -146,8 +160,8 @@ local definitions: { Types.StageDefinition } = {
 		kind = "Boss",
 		description = "장갑이 열리는 순간에만 자석이 통한다. 패턴을 읽어라.",
 		allowedActions = { "Pull", "Push" },
-		medals = { Gold = seconds(110), Silver = seconds(150), Bronze = seconds(210) },
-		minPossibleMs = seconds(45),
+		medals = { Gold = seconds(51), Silver = seconds(69), Bronze = seconds(97) },
+		minPossibleMs = seconds(18),
 		checkpointCount = 1,
 		originX = 16000,
 		hasLayout = true,
@@ -160,8 +174,8 @@ local definitions: { Types.StageDefinition } = {
 		kind = "Boss",
 		description = "이동, 전투, 퍼즐 전부. 배운 것을 전부 쓰지 않으면 이길 수 없다.",
 		allowedActions = { "Pull", "Push" },
-		medals = { Gold = seconds(180), Silver = seconds(240), Bronze = seconds(330) },
-		minPossibleMs = seconds(75),
+		medals = { Gold = seconds(159), Silver = seconds(215), Bronze = seconds(302) },
+		minPossibleMs = seconds(56),
 		checkpointCount = 2,
 		originX = 18000,
 		hasLayout = true,
@@ -178,8 +192,8 @@ local definitions: { Types.StageDefinition } = {
 		kind = "Extra",
 		description = "바닥이 없다. 벽만 있다. 붙어 있지 않으면 떨어진다.",
 		allowedActions = { "Pull", "Push" },
-		medals = { Gold = seconds(105), Silver = seconds(145), Bronze = seconds(200) },
-		minPossibleMs = seconds(42),
+		medals = { Gold = seconds(55), Silver = seconds(74), Bronze = seconds(104) },
+		minPossibleMs = seconds(19),
 		checkpointCount = 3,
 		originX = 20000,
 		hasLayout = true,
@@ -192,8 +206,8 @@ local definitions: { Types.StageDefinition } = {
 		kind = "Extra",
 		description = "전 구간 이동식. 멈추면 떨어진다.",
 		allowedActions = { "Pull", "Push" },
-		medals = { Gold = seconds(115), Silver = seconds(155), Bronze = seconds(215) },
-		minPossibleMs = seconds(46),
+		medals = { Gold = seconds(105), Silver = seconds(142), Bronze = seconds(200) },
+		minPossibleMs = seconds(37),
 		checkpointCount = 3,
 		originX = 22000,
 		hasLayout = true,

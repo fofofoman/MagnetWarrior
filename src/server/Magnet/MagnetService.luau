@@ -288,7 +288,7 @@ local function applyToObject(
 	end
 
 	part:ApplyImpulse(impulse)
-	MagneticRegistry.MarkImpulsed(part, player)
+	MagneticRegistry.MarkImpulsed(part, player, action, impulse.Magnitude)
 end
 
 local function stopGrapple(player: Player)

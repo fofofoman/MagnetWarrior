@@ -25,6 +25,7 @@ local Signal = require(Shared.Util.Signal)
 local SoundKit = require(Shared.Util.SoundKit)
 
 local MagneticRegistry = require(script.Parent.Parent.Magnet.MagneticRegistry)
+local StageActivity = require(script.Parent.Parent.Stage.StageActivity)
 
 local EnemyService = {}
 
@@ -341,6 +342,13 @@ local function stepAi()
 	for part, state in enemies do
 		if not part.Parent then
 			enemies[part] = nil
+			continue
+		end
+
+		-- Nobody near this stage: no chasing, no hovering, no raycasts. The drone
+		-- keeps its position and picks up where it left off when someone arrives.
+		if not StageActivity.IsAwake(state.stageId) then
+			state.velocity.Enabled = false
 			continue
 		end
 

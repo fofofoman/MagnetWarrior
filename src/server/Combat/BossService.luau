@@ -32,6 +32,7 @@ local TweenService = game:GetService("TweenService")
 
 local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
 local GameConfig = require(Shared.Config.GameConfig)
+local MagnetConfig = require(Shared.Config.MagnetConfig)
 local Net = require(Shared.Net)
 local Signal = require(Shared.Util.Signal)
 local SoundKit = require(Shared.Util.SoundKit)
@@ -39,6 +40,7 @@ local Trove = require(Shared.Util.Trove)
 
 local EnemyService = require(script.Parent.EnemyService)
 local MagneticRegistry = require(script.Parent.Parent.Magnet.MagneticRegistry)
+local StageActivity = require(script.Parent.Parent.Stage.StageActivity)
 
 local BossService = {}
 
@@ -58,17 +60,27 @@ local PLATE_COLOR = Color3.fromRGB(96, 104, 118)
 local CORE_HOLD_FORCE = 40000
 local CORE_RESPONSIVENESS = 8
 
---- Yank detection is by *displacement from the cradle*, not by speed. The
---- velocity spike from a Pull lasts a few frames and this loop runs at 15 Hz,
---- so sampling speed would miss most successful yanks; displacement persists
---- long enough to be seen.
+--- Yanking the core is awarded from the impulse the magnet actually applied,
+--- reported by MagneticRegistry.Impulsed.
 ---
---- TUNING: this threshold is the one number here that wants checking against
---- the real engine. Too high and Pull does nothing to the boss; too low and the
---- core's idle drift triggers free damage.
-local YANK_DISTANCE = 2.5
-local YANK_DAMAGE = 55
-local YANK_COOLDOWN = 1.2
+--- The obvious implementations both fail. Sampling the core's speed misses the
+--- spike, because a Pull's velocity change lasts a few frames and this loop runs
+--- at 15 Hz. Measuring how far the core left its cradle works, but the distance
+--- depends entirely on how an AlignPosition spring behaves under load — a number
+--- that cannot be derived from the code and would have needed tuning against the
+--- live engine. The impulse is a value the server computed itself, so it is
+--- exact, frame-rate independent, and unaffected by any constraint tuning.
+---
+--- Damage scales with how much of a full-strength Pull landed, which makes
+--- closing the distance to the exposed core worth doing.
+--- The cooldown is what keeps the two damage sources complementary. At 1.2s a
+--- window fits three yanks, which out-damages the scrap and turns the fight into
+--- "stand close and spam Pull" — the opposite of the intended loop, where the
+--- boss arms you and you turn its own ammunition around. At 2.0s a window fits
+--- roughly two, and deflected scrap stays the larger share.
+local YANK_MAX_DAMAGE = 55
+local YANK_MIN_SHARE = 0.35 -- below this fraction of a full pull, it is a graze
+local YANK_COOLDOWN = 2.0
 
 local SCRAP_DAMAGE = 18
 local SCRAP_LIFETIME = 14
@@ -389,6 +401,18 @@ local function step()
 			continue
 		end
 
+		-- An empty arena does not need its boss cycling armour and lobbing scrap
+		-- at nobody. The phase timers are pushed forward so the fight starts from
+		-- its sealed state when someone walks in, rather than mid-window.
+		if not StageActivity.IsAwake(state.stageId) then
+			state.phaseUntil = now + state.spec.closedSeconds
+			state.nextThrowAt = now + state.spec.throwInterval
+			if state.spec.adds then
+				state.nextAddAt = now + state.spec.adds.interval
+			end
+			continue
+		end
+
 		-- Telegraph: while sealed, the plates heat up over the last moment before
 		-- they retract.
 		if not state.open then
@@ -408,15 +432,6 @@ local function step()
 			local nextOpen = not state.open
 			setArmor(state, nextOpen)
 			state.phaseUntil = now + (if nextOpen then state.spec.openSeconds else state.spec.closedSeconds)
-		end
-
-		-- Yank damage: only while exposed, and only if the core actually left
-		-- its cradle.
-		if state.open and (core.Position - state.anchorPosition).Magnitude >= YANK_DISTANCE then
-			if (now - state.lastYankAt) >= YANK_COOLDOWN then
-				state.lastYankAt = now
-				EnemyService.Damage(core, YANK_DAMAGE, MagneticRegistry.Thrower(core))
-			end
 		end
 
 		if now >= state.nextThrowAt then
@@ -447,7 +462,37 @@ function BossService.ResetStage(stageId: string)
 	end
 end
 
+--- A Pull on an exposed core is a yank. Push is not: shoving the core deeper
+--- into its cradle is not wrenching it out.
+local function onImpulsed(part: BasePart, player: Player, action: string, magnitude: number)
+	if action ~= "Pull" then
+		return
+	end
+
+	for _, state in bosses do
+		if state.core ~= part or not state.open or not state.alive then
+			continue
+		end
+
+		local share = magnitude / MagnetConfig.PullImpulse
+		if share < YANK_MIN_SHARE then
+			return
+		end
+
+		local now = os.clock()
+		if (now - state.lastYankAt) < YANK_COOLDOWN then
+			return
+		end
+		state.lastYankAt = now
+
+		EnemyService.Damage(state.core, YANK_MAX_DAMAGE * math.clamp(share, 0, 1), player)
+		return
+	end
+end
+
 function BossService.Start()
+	MagneticRegistry.Impulsed:Connect(onImpulsed)
+
 	EnemyService.EnemyDied:Connect(function(part: BasePart, stageId: string, group: string)
 		for key, state in bosses do
 			if state.core ~= part then

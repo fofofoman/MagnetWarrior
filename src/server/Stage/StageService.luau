@@ -35,6 +35,7 @@ local GateService = require(script.Parent.GateService)
 local MagnetService = require(script.Parent.Parent.Magnet.MagnetService)
 local PuzzleService = require(script.Parent.PuzzleService)
 local RunSessionService = require(script.Parent.Parent.Run.RunSessionService)
+local StageActivity = require(script.Parent.StageActivity)
 local StageBuilder = require(script.Parent.StageBuilder)
 
 local StageService = {}
@@ -287,6 +288,9 @@ function StageService.Start()
 		local ok, result = pcall(StageBuilder.Build, definition, layout, stages)
 		if ok then
 			built[definition.id] = result
+			-- Lets the enemy, kinetic and boss systems skip this stage entirely
+			-- while nobody is near it.
+			StageActivity.Register(definition.id, definition.originX)
 			-- Anything knocked below the stage dies rather than falling forever.
 			EnemyService.SetStageVoidY(definition.id, result.killY)
 			if result.boss then

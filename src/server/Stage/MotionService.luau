@@ -33,6 +33,7 @@ local GameConfig = require(Shared.Config.GameConfig)
 local SoundKit = require(Shared.Util.SoundKit)
 
 local ClingController = require(script.Parent.Parent.Magnet.ClingController)
+local StageActivity = require(script.Parent.StageActivity)
 
 local MotionService = {}
 
@@ -41,6 +42,7 @@ local DEAD_COLOR = Color3.fromRGB(58, 62, 70)
 
 type KineticState = {
 	part: BasePart,
+	stageId: string?,
 	home: CFrame,
 	travel: Vector3?,
 	period: number,
@@ -105,8 +107,11 @@ local function register(instance: Instance)
 	local phase = instance:GetAttribute("Phase")
 	local pulsePhase = instance:GetAttribute("PulsePhase")
 
+	local stageId = instance:GetAttribute("StageId")
+
 	local state: KineticState = {
 		part = instance,
+		stageId = if typeof(stageId) == "string" then stageId else nil,
 		home = instance.CFrame,
 		travel = if typeof(travel) == "Vector3" and travel.Magnitude > 0 then travel else nil,
 		period = period,
@@ -133,6 +138,13 @@ local function step()
 	for part, state in states do
 		if not part.Parent then
 			states[part] = nil
+			continue
+		end
+
+		-- Phase is derived from absolute time, so a sleeping wall resumes at the
+		-- position it would have reached anyway — no drift, and the wake radius
+		-- is wide enough that it is already moving before anyone can see it.
+		if not StageActivity.IsAwake(state.stageId) then
 			continue
 		end
 

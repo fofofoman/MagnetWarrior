@@ -35,10 +35,12 @@ local MagnetService = require(script.Magnet.MagnetService)
 local MonetizationService = require(script.Monetization.MonetizationService)
 local MotionService = require(script.Stage.MotionService)
 local MovementAudit = require(script.Run.MovementAudit)
+local MedalCalibration = require(script.Data.MedalCalibration)
 local PuzzleService = require(script.Stage.PuzzleService)
 local RecordService = require(script.Data.RecordService)
 local RespawnService = require(script.Run.RespawnService)
 local RunSessionService = require(script.Run.RunSessionService)
+local StageActivity = require(script.Stage.StageActivity)
 local StageService = require(script.Stage.StageService)
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -162,6 +164,10 @@ local function main()
 	DataService.Start()
 	MonetizationService.Start()
 
+	-- Before the tag-driven systems: they consult it every tick, and an
+	-- unstarted tracker would report every stage awake.
+	StageActivity.Start()
+
 	-- Tag-driven systems, before the world exists.
 	MagnetService.Start()
 	EnemyService.Start()
@@ -177,6 +183,7 @@ local function main()
 	RunSessionService.Start()
 	RecordService.Start()
 	GhostService.Start()
+	MedalCalibration.Start()
 
 	wireMagnetHooks()
 	wireCheckpointSave()

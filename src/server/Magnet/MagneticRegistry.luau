@@ -19,8 +19,16 @@ local Players = game:GetService("Players")
 local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
 local GameConfig = require(Shared.Config.GameConfig)
 local MagnetConfig = require(Shared.Config.MagnetConfig)
+local Signal = require(Shared.Util.Signal)
 
 local MagneticRegistry = {}
+
+--- Fired with (part, player, action, impulseMagnitude) every time the magnet
+--- moves something. Systems that need to react to *the force the server
+--- applied* — rather than to whatever the physics engine did with it
+--- afterwards — listen here. BossService uses it so its damage window does not
+--- depend on how far a constraint happens to stretch.
+MagneticRegistry.Impulsed = Signal.new()
 
 export type MagneticInfo = {
 	part: BasePart,
@@ -143,13 +151,15 @@ end
 
 --- Records who threw this part and when, so CombatService can attribute impact
 --- damage and ignore objects that are merely rolling around.
-function MagneticRegistry.MarkImpulsed(part: BasePart, player: Player)
+function MagneticRegistry.MarkImpulsed(part: BasePart, player: Player, action: string?, magnitude: number?)
 	local info = infoByPart[part]
 	if not info then
 		return
 	end
 	info.lastImpulseAt = os.clock()
 	info.lastImpulseBy = player
+
+	MagneticRegistry.Impulsed:Fire(part, player, action or "Push", magnitude or 0)
 end
 
 --- True while the part still counts as "thrown".

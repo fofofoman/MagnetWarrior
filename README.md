@@ -73,7 +73,8 @@ src/
 │   │   ├── DataService.luau        버전 관리되는 프로필 DataStore
 │   │   ├── RecordService.luau      개인 기록·메달 확정
 │   │   ├── LeaderboardService.luau OrderedDataStore — 개인/친구/글로벌
-│   │   └── GhostService.luau       고스트 저장·열람 (열람권 소비)
+│   │   ├── GhostService.luau       고스트 저장·열람 (열람권 소비)
+│   │   └── MedalCalibration.luau   실제 완주 시간 분포 → 기준시간 제안
 │   ├── Combat/
 │   │   ├── EnemyService.luau       자석으로 잡히는 부유 드론
 │   │   ├── CombatService.luau      충돌 속도 기반 데미지
@@ -83,6 +84,7 @@ src/
 │   │   ├── StageBuilder.luau       데이터 → 지오메트리
 │   │   ├── PuzzleService.luau      철제 블록 조립
 │   │   ├── MotionService.luau      움직이는 벽 + 극성 전환
+│   │   ├── StageActivity.luau      플레이어 없는 스테이지 절전
 │   │   ├── GateService.luau        적 전멸/퍼즐 완성 → 문 열림
 │   │   ├── HazardService.luau      낙사·위험지대
 │   │   └── Layouts/                스테이지 12개의 레이아웃 데이터
@@ -105,6 +107,11 @@ src/
         ├── ShopPanel.luau      게임패스·아이템 구매, 외형 선택
         ├── RespawnPrompt.luau  사망 대기 + 즉시 재시도
         └── Toast.luau          서버 알림
+```
+
+```
+tools/
+└── estimate_medals.py          레이아웃 → 메달 기준시간 산출 (재실행 가능)
 ```
 
 ---
@@ -163,34 +170,52 @@ src/
 - [`docs/ANTI_CHEAT.md`](docs/ANTI_CHEAT.md) — 기록이 신뢰할 만한 이유, 검증 계층 전체
 - [`docs/MONETIZATION.md`](docs/MONETIZATION.md) — 판매 정책, 자산 ID 연결 방법, 확장 지점
 
-## 남은 것
+## 밸런스
 
-- **사운드 에셋이 아직 없다.** 배선은 끝났다 — 32개 사운드가 전부 호출 지점에 연결되어 있고
-  `SoundConfig`의 `assetId`가 `0`인 동안에는 조용히 no-op이다. 크리에이터 대시보드에서 만든
-  ID를 그 표에 넣으면 다른 파일을 건드리지 않고 소리가 난다. (게임패스 자산 ID와 같은 방식)
-- **시즌 패스와 리워드 광고는 의도적으로 미구현이다.** 붙을 자리만
-  `MonetizationConfig.PlannedRevenueStreams`에 잡혀 있고, `Validate()`가 그 자리에도
-  Pay-to-win 검사를 건다. 자세한 건 [`docs/MONETIZATION.md`](docs/MONETIZATION.md).
+**메달 기준시간은 손으로 찍은 값이 아니라 생성된 값이다.**
+`tools/estimate_medals.py`가 레이아웃에서 실제 경로를 재고, 플레이어를 멈추게 하는 모든 것(적,
+소켓, 게이트, 극성 대기, 보스 장갑 사이클)의 비용을 더해서 계산한다. 튜닝을 바꾼 뒤에는 추측
+대신 다시 돌리면 된다.
 
-## 밸런스 메모
+```bash
+python3 tools/estimate_medals.py            # 제안 표만 출력
+python3 tools/estimate_medals.py --apply    # StageConfig에 반영
+```
 
-- **메달 기준시간은 한 번 다시 잡아야 한다.** 이동 모멘텀이 누적되고 슬램 데미지가 정상화되면서
-  전체적으로 빨라졌는데, 기준시간은 그 전에 정해진 값이다. 실제로 뛰어본 뒤
-  `StageConfig`에서 골드 ≈ 본인의 깔끔한 클리어 타임, 실버 ≈ 골드×1.35,
-  브론즈 ≈ 골드×1.9로 맞추면 된다 (지금 표가 쓰고 있는 비율과 같다).
-  `minPossibleMs`(치트 판정 하한)는 경로 길이 ÷ 최대속도라 그대로 유효하므로 건드릴 필요 없다.
+가정은 의도적으로 비관적이다 — 아무도 못 따는 메달은 죽은 목표지만, 조금 후한 메달은 그래도
+작동하기 때문이다.
+
+**실제 플레이 데이터가 쌓이면 그쪽이 더 정확하다.** `MedalCalibration`이 검증을 통과한 완주
+시간을 스테이지별 히스토그램으로 모은다. 서버 콘솔이나 Studio 커맨드바에서:
+
+```lua
+require(game.ServerScriptService.Server.Data.MedalCalibration).Report()
+require(game.ServerScriptService.Server.Data.MedalCalibration).ProposeConfig()
+```
+
+p20/p50/p80과 현재 기준시간을 나란히 보여주고, 붙여넣을 수 있는 `StageConfig` 줄을 뽑아준다.
+스테이지당 100회 정도 쌓이기 전에는 참고만 하면 된다.
+
+### 알아둘 것
+
 - **하울러는 벽에 처박아 죽일 수 없다.** 질량 108이라 슬램으로는 17 데미지(150 HP)밖에 안 나온다.
   의도된 것이다 — 하울러는 *처박는 대상*이 아니라 *처박는 도구*이고, 상자나 다른 적을 던져야
   잡힌다. 4번 스테이지가 가르치려는 것이 정확히 이것이다.
+- **보스 데미지의 70% 정도는 스크랩 되받아치기에서 나온다.** 코어 뽑기(Pull)는 보조다. 이 비율이
+  뒤집히면 "가까이 붙어서 Pull만 연타"가 최적해가 되므로, `YANK_COOLDOWN`을 만질 때는 확인이
+  필요하다.
+
+## 남은 것
+
+- **사운드 에셋.** 배선은 끝났다 — 32개 사운드가 전부 호출 지점에 연결되어 있고
+  `SoundConfig`의 `assetId`가 `0`인 동안에는 조용히 no-op이다. 크리에이터 대시보드에서 만든
+  ID를 그 표에 넣으면 다른 파일을 건드리지 않고 소리가 난다. (게임패스 자산 ID와 같은 방식)
+  오디오 파일 자체는 업로드가 필요해서 코드로 해결할 수 있는 부분이 아니다.
+- **시즌 패스와 리워드 광고는 기획서대로 미구현이다.** "후순위, 지금 구현 안 함 — 연동 구조만
+  확장 가능하게"라고 지정하신 대로 자리만 잡혀 있고, `Validate()`가 그 자리에도 Pay-to-win
+  검사를 건다. 구현이 필요하시면 말씀해 주세요.
 
 ## 알려진 제약
 
-- **보스의 "코어 뽑기" 판정은 Studio에서 한 번 맞춰봐야 한다.** `BossService`의
-  `YANK_DISTANCE`는 AlignPosition 스프링이 실제로 얼마나 늘어나는지에 달려 있어서 코드만으로는
-  확정할 수 없다. 스크랩을 되받아쳐서 넣는 쪽이 주된 damage 경로이므로 이 값이 어긋나도 보스를
-  못 잡지는 않는다.
 - **스테이지는 서버 전체가 공유한다.** 같은 스테이지를 아무도 달리고 있지 않을 때 퍼즐·적·문이
   초기화된다. 완전한 인스턴싱이 필요해지면 `StageService.ResetStage`가 시작점이다.
-- **12개 스테이지가 항상 동시에 시뮬레이션된다.** 움직이는 벽과 적이 전부 상시 동작하므로,
-  서버 부하가 문제가 되면 플레이어가 없는 스테이지를 잠재우는 것이 첫 번째 최적화 지점이다.
-  (사운드는 이미 근처에 사람이 없으면 재생하지 않는다 — `SoundKit.anyoneNearby`)
