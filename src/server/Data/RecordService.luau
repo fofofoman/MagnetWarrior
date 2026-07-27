@@ -14,6 +14,7 @@ local Players = game:GetService("Players")
 local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
 local Net = require(Shared.Net)
 local RateLimiter = require(Shared.Util.RateLimiter)
+local Signal = require(Shared.Util.Signal)
 local StageConfig = require(Shared.Config.StageConfig)
 local Types = require(Shared.Types)
 
@@ -22,6 +23,11 @@ local LeaderboardService = require(script.Parent.LeaderboardService)
 local RunSessionService = require(script.Parent.Parent.Run.RunSessionService)
 
 local RecordService = {}
+
+--- Fired after a verified personal best has been written to the profile.
+--- GhostService listens so a stored ghost always corresponds to a run that
+--- passed the same validation the leaderboard requires.
+RecordService.PersonalBestSet = Signal.new() -- (player, stageId, timeMs)
 
 --- Leaderboard reads hit DataStores, so they get a much tighter limit than the
 --- cheap local reads.
@@ -98,6 +104,7 @@ local function onRunFinished(player: Player, result: any)
 	end
 
 	if isPersonalBest then
+		RecordService.PersonalBestSet:Fire(player, stageId, timeMs)
 		LeaderboardService.InvalidatePlayer(player)
 		task.spawn(function()
 			LeaderboardService.Submit(player.UserId, stageId, timeMs)
@@ -176,7 +183,42 @@ local function getLeaderboard(player: Player, stageId: any, scope: any): Types.L
 		return LeaderboardService.GetFriendBoard(player, stageId)
 	end
 
-	return LeaderboardService.GetGlobalBoard(stageId)
+	local board = LeaderboardService.GetGlobalBoard(stageId)
+
+	-- A top-10 board that does not mention you at all is demoralising and
+	-- uninformative. If the player has a record and is not on the page, append
+	-- it with rank 0, which the client renders as an unranked "내 기록" row.
+	local profile = DataService.Get(player)
+	local record = profile and profile.records[stageId]
+	if not board.unavailableReason and isCompleted(record) then
+		local listed = false
+		for _, entry in board.entries do
+			if entry.userId == player.UserId then
+				listed = true
+				break
+			end
+		end
+
+		if not listed then
+			-- Copy before appending: the payload is a shared cache entry.
+			local entries = table.clone(board.entries)
+			table.insert(entries, {
+				userId = player.UserId,
+				displayName = player.DisplayName,
+				timeMs = record.bestTimeMs,
+				medal = record.medal,
+				rank = 0,
+			})
+			board = {
+				stageId = board.stageId,
+				scope = board.scope,
+				entries = entries,
+				unavailableReason = board.unavailableReason,
+			}
+		end
+	end
+
+	return board
 end
 
 function RecordService.Start()

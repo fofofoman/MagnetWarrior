@@ -27,11 +27,31 @@ local RunService = game:GetService("RunService")
 local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
 local GameConfig = require(Shared.Config.GameConfig)
 local MagnetConfig = require(Shared.Config.MagnetConfig)
+local Net = require(Shared.Net)
+local SoundKit = require(Shared.Util.SoundKit)
 
 local EnemyService = require(script.Parent.EnemyService)
 local MagneticRegistry = require(script.Parent.Parent.Magnet.MagneticRegistry)
 
 local CombatService = {}
+
+--- Impacts above this share of ImpactMaxDamage read as "heavy" and get the
+--- bigger sound and burst.
+local HEAVY_IMPACT_SHARE = 0.45
+
+--- Announces an impact so clients can spawn particles and shake the camera.
+--- Broadcast rather than sent to the thrower alone: a crate hitting a wall is a
+--- world event, and everyone nearby should see it.
+local function announceImpact(kind: string, position: Vector3, damage: number, color: Color3?)
+	Net.CombatFeedback:FireAllClients({
+		kind = kind,
+		position = position,
+		magnitude = math.clamp(damage / MagnetConfig.ImpactMaxDamage, 0, 1),
+		color = color,
+	})
+end
+
+CombatService.AnnounceImpact = announceImpact
 
 --- How long a sampled velocity stays usable, in seconds.
 local VELOCITY_SAMPLE_TTL = 0.25
@@ -92,10 +112,15 @@ local function onTouched(mover: BasePart, other: BasePart)
 		return
 	end
 
+	local heavy = damage >= MagnetConfig.ImpactMaxDamage * HEAVY_IMPACT_SHARE
+	local contact = (mover.Position + other.Position) / 2
+
 	-- Enemy hit by a thrown object (including another enemy).
 	if EnemyService.IsEnemy(other) then
 		if MagneticRegistry.TryConsumeDamageWindow(mover, other) then
 			EnemyService.Damage(other, damage, thrower)
+			SoundKit.PlayAt(if heavy then "ImpactHeavy" else "ImpactLight", contact)
+			announceImpact("Impact", contact, damage, other.Color)
 		end
 		return
 	end
@@ -106,6 +131,8 @@ local function onTouched(mover: BasePart, other: BasePart)
 		-- constantly puts objects near the thrower.
 		if victimPlayer ~= thrower and MagneticRegistry.TryConsumeDamageWindow(mover, other) then
 			victimHumanoid:TakeDamage(damage)
+			SoundKit.PlayAt("PlayerHurt", contact)
+			announceImpact("PlayerHurt", contact, damage)
 		end
 		return
 	end
@@ -114,6 +141,16 @@ local function onTouched(mover: BasePart, other: BasePart)
 	-- the "slam it into a wall" kill.
 	if EnemyService.IsEnemy(mover) and MagneticRegistry.TryConsumeDamageWindow(mover, other) then
 		EnemyService.Damage(mover, damage, thrower)
+		SoundKit.PlayAt(if heavy then "ImpactHeavy" else "ImpactLight", contact)
+		announceImpact("Impact", contact, damage, mover.Color)
+		return
+	end
+
+	-- A thrown crate hitting scenery still deserves a thud, just no damage
+	-- event — this is most of what the player hears while learning to aim.
+	if MagneticRegistry.TryConsumeDamageWindow(mover, other) then
+		SoundKit.PlayAt(if heavy then "ImpactHeavy" else "ImpactLight", contact)
+		announceImpact("Impact", contact, damage * 0.5, mover.Color)
 	end
 end
 

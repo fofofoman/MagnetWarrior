@@ -6,6 +6,9 @@
 	alongside the rest of the project.
 ]]
 
+local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
+local SoundKit = require(Shared.Util.SoundKit)
+
 local Theme = {}
 
 Theme.Colors = {
@@ -75,6 +78,16 @@ function Theme.create(className: string, props: { [string]: any }?, children: { 
 	end
 
 	return instance
+end
+
+--- Gives a button its click sound. Applied at construction so no call site has
+--- to remember, and so the click is heard even when the handler is slow.
+function Theme.clickable<T>(button: T): T
+	local instance = button :: any
+	instance.Activated:Connect(function()
+		SoundKit.PlayLocal("ButtonClick")
+	end)
+	return button
 end
 
 --- Rounded corners + a hairline stroke, applied to a frame.

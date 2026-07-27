@@ -6,13 +6,19 @@
 
 local GameConfig = {}
 
---- Feature flags. The global leaderboard is deliberately off: the write path
---- runs from day one so records accumulate, but the read path stays hidden
---- until the 2nd-phase UI ships.
+--- Feature flags. Each one gates a *read* path only — the systems behind them
+--- have been writing data since the first build, which is what made turning
+--- them on a flag flip rather than a migration.
 GameConfig.Features = {
-	GlobalLeaderboard = false,
+	--- Phase 2. The write path has been live since day one, so switching this on
+	--- exposes records that already exist rather than an empty board.
+	GlobalLeaderboard = true,
 	FriendLeaderboard = true,
-	GhostReplay = false, -- consumable product exists; playback lands with the ghost recorder
+	--- Recording, storage and playback are all implemented; the ticket product
+	--- gates access to *other people's* ghosts only.
+	GhostReplay = true,
+	--- Still deliberately unbuilt — see docs/MONETIZATION.md for the shape they
+	--- will plug into.
 	SeasonPass = false,
 	RewardedAds = false,
 }

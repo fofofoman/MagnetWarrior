@@ -30,6 +30,7 @@ local RunService = game:GetService("RunService")
 
 local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
 local GameConfig = require(Shared.Config.GameConfig)
+local SoundKit = require(Shared.Util.SoundKit)
 
 local ClingController = require(script.Parent.Parent.Magnet.ClingController)
 
@@ -64,6 +65,10 @@ local function setPolarity(state: KineticState, live: boolean)
 	state.live = live
 
 	local part = state.part
+	-- Audible as well as visible: the timing stages are readable by ear once
+	-- the player learns the tempo, which is the point of giving every wall in a
+	-- stage the same period.
+	SoundKit.PlayAt(if live then "PolarityOn" else "PolarityOff", part.Position)
 
 	if live then
 		CollectionService:AddTag(part, GameConfig.Tags.Magnetic)

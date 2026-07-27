@@ -29,6 +29,7 @@ local DataService = require(script.Data.DataService)
 local EnemyService = require(script.Combat.EnemyService)
 local Entitlements = require(script.Monetization.Entitlements)
 local GateService = require(script.Stage.GateService)
+local GhostService = require(script.Data.GhostService)
 local HazardService = require(script.Stage.HazardService)
 local MagnetService = require(script.Magnet.MagnetService)
 local MonetizationService = require(script.Monetization.MonetizationService)
@@ -171,9 +172,11 @@ local function main()
 	MotionService.Start()
 	HazardService.Start()
 
-	-- Run systems.
+	-- Run systems. GhostService starts after RecordService because it listens to
+	-- that service's personal-best signal.
 	RunSessionService.Start()
 	RecordService.Start()
+	GhostService.Start()
 
 	wireMagnetHooks()
 	wireCheckpointSave()

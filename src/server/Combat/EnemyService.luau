@@ -20,7 +20,9 @@ local RunService = game:GetService("RunService")
 
 local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
 local GameConfig = require(Shared.Config.GameConfig)
+local Net = require(Shared.Net)
 local Signal = require(Shared.Util.Signal)
+local SoundKit = require(Shared.Util.SoundKit)
 
 local MagneticRegistry = require(script.Parent.Parent.Magnet.MagneticRegistry)
 
@@ -216,7 +218,9 @@ function EnemyService.SetStageVoidY(stageId: string, y: number)
 	voidY[stageId] = y
 end
 
-function EnemyService.Damage(part: BasePart, amount: number, killer: Player?)
+--- `silent` suppresses the death sound and burst. Used for void kills, whose
+--- effects would play far below the stage where nobody can see or hear them.
+function EnemyService.Damage(part: BasePart, amount: number, killer: Player?, silent: boolean?)
 	local state = enemies[part]
 	if not state or amount <= 0 then
 		return
@@ -239,6 +243,16 @@ function EnemyService.Damage(part: BasePart, amount: number, killer: Player?)
 
 	local stageId, group = state.stageId, state.group
 	EnemyService.EnemyDied:Fire(part, stageId, group, killer)
+
+	if not silent then
+		SoundKit.PlayAt("EnemyDeath", part.Position)
+		Net.CombatFeedback:FireAllClients({
+			kind = "EnemyDeath",
+			position = part.Position,
+			magnitude = math.clamp(state.kind.health / 150, 0.35, 1),
+			color = state.kind.color,
+		})
+	end
 
 	-- Brief death flash before removal, so a kill reads clearly.
 	part.Anchored = true
@@ -311,7 +325,7 @@ local function stepAi()
 		-- the entire point of the "knock them into the pit" stages.
 		local floor = voidY[state.stageId]
 		if floor and part.Position.Y < floor then
-			EnemyService.Damage(part, (part:GetAttribute("Health") or 1) + 1, state.lastThrower)
+			EnemyService.Damage(part, (part:GetAttribute("Health") or 1) + 1, state.lastThrower, true)
 			continue
 		end
 

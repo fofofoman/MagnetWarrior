@@ -129,6 +129,7 @@ local function build()
 			Parent = buttonRow,
 		})
 		create("UICorner", { CornerRadius = UDim.new(0, 8), Parent = button })
+		Theme.clickable(button)
 		button.Activated:Connect(onClick)
 	end
 

@@ -5,11 +5,17 @@
 	Left: the twelve-stage roster with each stage's personal best and best medal.
 	Right: the ranking board for the selected stage, in three scopes.
 
-	The scopes mirror the rollout order. 개인 and 친구 are live. 글로벌 is present
-	and selectable, but the server answers it with `unavailableReason` while
-	GameConfig.Features.GlobalLeaderboard is off, and this panel renders that
-	reason rather than hiding the tab — so phase 2 is a server-side flag flip,
-	not a client change.
+	All three scopes are live. The panel never hides a tab: when the server
+	declines a scope it returns an `unavailableReason` and that text is shown
+	instead, which is how the global board stayed selectable through the phase
+	where it was switched off.
+
+	A global page that does not mention you at all is useless, so the server
+	appends your own record with rank 0 when you are outside the top 10, and this
+	renders that as an unranked "내 기록" row.
+
+	Ghosts load from here too. Loading is explicit and sticky: the ghost you pick
+	races you on your next run of that stage until you pick another.
 
 	Lock state is shown here as a courtesy. The server independently refuses a
 	teleport to a locked stage, so a modified client that enables every button
@@ -25,6 +31,8 @@ local Net = require(Shared.Net)
 local StageConfig = require(Shared.Config.StageConfig)
 local TimeFormat = require(Shared.Util.TimeFormat)
 
+local GhostPlayer = require(script.Parent.Parent.Effects.GhostPlayer)
+local SoundKit = require(Shared.Util.SoundKit)
 local Theme = require(script.Parent.Theme)
 
 local LeaderboardPanel = {}
@@ -42,6 +50,8 @@ local headerLabel: TextLabel
 local medalLabel: TextLabel
 local statusLabel: TextLabel
 local teleportButton: TextButton
+local ghostStatus: TextLabel
+local ghostButtons: { TextButton } = {}
 local scopeButtons: { [string]: TextButton } = {}
 
 local roster: { any } = {}
@@ -102,7 +112,9 @@ local function renderEntries(payload: any)
 			Size = UDim2.fromOffset(34, 34),
 			BackgroundTransparency = 1,
 			Font = Theme.FontBold,
-			Text = `{entry.rank}`,
+			-- rank 0 is the server's marker for "your time, but outside the
+			-- page" — see RecordService.getLeaderboard.
+			Text = if entry.rank > 0 then `{entry.rank}` else "—",
 			TextColor3 = Theme.Colors.TextDim,
 			TextSize = 14,
 			TextXAlignment = Enum.TextXAlignment.Left,
@@ -114,7 +126,7 @@ local function renderEntries(payload: any)
 			Size = UDim2.new(1, -190, 1, 0),
 			BackgroundTransparency = 1,
 			Font = Theme.Font,
-			Text = entry.displayName,
+			Text = if entry.rank > 0 then entry.displayName else `{entry.displayName} (내 기록)`,
 			TextColor3 = Theme.Colors.Text,
 			TextSize = 14,
 			TextXAlignment = Enum.TextXAlignment.Left,
@@ -209,6 +221,17 @@ local function selectStage(stageId: string)
 	teleportButton.BackgroundColor3 = if canPlay then Theme.Colors.Accent else Theme.Colors.PanelRaised
 	teleportButton.TextColor3 = if canPlay then Theme.Colors.Background else Theme.Colors.TextDim
 	teleportButton:SetAttribute("Enabled", canPlay)
+
+	for _, button in ghostButtons do
+		button.AutoButtonColor = canPlay
+		button.TextColor3 = if canPlay then Theme.Colors.Text else Theme.Colors.TextDim
+	end
+
+	local ghost = GhostPlayer.LoadedFor(stageId)
+	ghostStatus.Text = if ghost
+		then `고스트: {ghost.displayName} · {TimeFormat.Short(ghost.timeMs)}`
+		else "고스트 없음 — 불러오면 다음 주행에 함께 달립니다"
+	ghostStatus.TextColor3 = if ghost then Theme.Colors.Accent else Theme.Colors.TextDim
 
 	requestBoard()
 end
@@ -462,6 +485,7 @@ local function build()
 			Parent = tabRow,
 		})
 		create("UICorner", { CornerRadius = UDim.new(0, 6), Parent = button })
+		Theme.clickable(button)
 		scopeButtons[scope.id] = button
 		button.Activated:Connect(function()
 			setScope(scope.id)
@@ -471,7 +495,7 @@ local function build()
 	entryList = create("ScrollingFrame", {
 		Name = "Entries",
 		Position = UDim2.fromOffset(16, 94),
-		Size = UDim2.new(1, -32, 1, -152),
+		Size = UDim2.new(1, -32, 1, -206),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		ScrollBarThickness = 4,
@@ -494,6 +518,82 @@ local function build()
 		Parent = boardFrame,
 	})
 
+	ghostStatus = create("TextLabel", {
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -92),
+		Size = UDim2.new(1, -32, 0, 16),
+		BackgroundTransparency = 1,
+		Font = Theme.Font,
+		Text = "",
+		TextColor3 = Theme.Colors.TextDim,
+		TextSize = 12,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		Parent = boardFrame,
+	})
+
+	local ghostRow = create("Frame", {
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -56),
+		Size = UDim2.new(1, -32, 0, 30),
+		BackgroundTransparency = 1,
+		Parent = boardFrame,
+	}, {
+		create("UIListLayout", {
+			FillDirection = Enum.FillDirection.Horizontal,
+			Padding = UDim.new(0, 8),
+		}),
+	})
+
+	--- Loading a ghost is a blocking DataStore read, so the button disables
+	--- itself for the duration rather than letting the player queue up requests
+	--- the rate limiter would only reject.
+	local function makeGhostButton(label: string, scope: string, unavailable: string)
+		local button = create("TextButton", {
+			Size = UDim2.new(0.5, -4, 1, 0),
+			BackgroundColor3 = Theme.Colors.PanelRaised,
+			BorderSizePixel = 0,
+			Font = Theme.Font,
+			Text = label,
+			TextColor3 = Theme.Colors.Text,
+			TextSize = 12,
+			Parent = ghostRow,
+		})
+		create("UICorner", { CornerRadius = UDim.new(0, 6), Parent = button })
+		Theme.clickable(button)
+		table.insert(ghostButtons, button)
+
+		button.Activated:Connect(function()
+			local stageId = selectedStageId
+			if not stageId or button:GetAttribute("Busy") then
+				return
+			end
+
+			button:SetAttribute("Busy", true)
+			ghostStatus.Text = "고스트를 불러오는 중…"
+			ghostStatus.TextColor3 = Theme.Colors.TextDim
+
+			task.spawn(function()
+				local payload = GhostPlayer.Request(stageId, scope)
+				button:SetAttribute("Busy", nil)
+
+				if not payload then
+					ghostStatus.Text = unavailable
+					ghostStatus.TextColor3 = Theme.Colors.Bad
+				elseif payload.unavailableReason then
+					ghostStatus.Text = payload.unavailableReason
+					ghostStatus.TextColor3 = Theme.Colors.Warn
+				else
+					ghostStatus.Text = `고스트: {payload.displayName} · {TimeFormat.Short(payload.timeMs)}`
+					ghostStatus.TextColor3 = Theme.Colors.Accent
+				end
+			end)
+		end)
+	end
+
+	makeGhostButton("내 고스트", "Personal", "고스트를 불러오지 못했습니다")
+	makeGhostButton("1위 고스트 (열람권)", "Best", "고스트를 불러오지 못했습니다")
+
 	teleportButton = create("TextButton", {
 		AnchorPoint = Vector2.new(0.5, 1),
 		Position = UDim2.new(0.5, 0, 1, -14),
@@ -507,6 +607,7 @@ local function build()
 		Parent = boardFrame,
 	})
 	create("UICorner", { CornerRadius = UDim.new(0, 8), Parent = teleportButton })
+	Theme.clickable(teleportButton)
 
 	teleportButton.Activated:Connect(function()
 		if not selectedStageId or teleportButton:GetAttribute("Enabled") ~= true then
@@ -523,6 +624,7 @@ function LeaderboardPanel.Toggle(open: boolean?)
 	isOpen = if open == nil then not isOpen else open
 	gui.Enabled = isOpen
 	if isOpen then
+		SoundKit.PlayLocal("PanelOpen")
 		refresh()
 	end
 end

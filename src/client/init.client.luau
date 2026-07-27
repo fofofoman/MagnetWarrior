@@ -11,6 +11,9 @@
 
 local Players = game:GetService("Players")
 
+local AudioController = require(script.AudioController)
+local GhostPlayer = require(script.Effects.GhostPlayer)
+local ImpactEffects = require(script.Effects.ImpactEffects)
 local MagnetController = require(script.MagnetController)
 local MagnetEffects = require(script.Effects.MagnetEffects)
 local Hud = require(script.UI.Hud)
@@ -29,6 +32,9 @@ local function main()
 
 	MagnetController.Start()
 	MagnetEffects.Start()
+	ImpactEffects.Start()
+	GhostPlayer.Start()
+	AudioController.Start()
 
 	Toast.Start()
 	Hud.Start()

@@ -18,6 +18,7 @@ local RunService = game:GetService("RunService")
 local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
 local GameConfig = require(Shared.Config.GameConfig)
 local Signal = require(Shared.Util.Signal)
+local SoundKit = require(Shared.Util.SoundKit)
 
 local PuzzleService = {}
 
@@ -115,11 +116,13 @@ local function place(socket: SocketState, block: BlockState)
 
 	local filled, total = groupCounts(socket.stageId, socket.group)
 	PuzzleService.SocketFilled:Fire(socket.stageId, socket.group, filled, total)
+	SoundKit.PlayAt("SocketFilled", socket.part.Position)
 
 	if filled == total and total > 0 then
 		local key = groupKey(socket.stageId, socket.group)
 		if not completedGroups[key] then
 			completedGroups[key] = true
+			SoundKit.PlayAt("PuzzleComplete", socket.part.Position)
 			PuzzleService.GroupCompleted:Fire(socket.stageId, socket.group)
 		end
 	end

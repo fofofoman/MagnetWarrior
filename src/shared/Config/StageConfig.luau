@@ -168,32 +168,36 @@ local definitions: { Types.StageDefinition } = {
 		requires = "stage_09_miniboss",
 	},
 
-	-- ── 5. 확장 여유분 ────────────────────────────────────────────────────────
+	-- ── 5. 확장 (클리어 후 도전) ──────────────────────────────────────────────
+	-- 원래 "확장 여유분"으로 비워둔 슬롯이었다. 채워 넣어도 확장 여지는 줄지 않는다 —
+	-- 로스터는 그냥 배열이라 13번 이후를 덧붙이는 데 아무 제약이 없다.
 	{
 		id = "stage_11_extra",
 		order = 11,
-		displayName = "확장 스테이지 I",
+		displayName = "무중력 격납고",
 		kind = "Extra",
-		description = "확장용 슬롯.",
+		description = "바닥이 없다. 벽만 있다. 붙어 있지 않으면 떨어진다.",
 		allowedActions = { "Pull", "Push" },
-		medals = { Gold = seconds(100), Silver = seconds(140), Bronze = seconds(195) },
-		minPossibleMs = seconds(40),
+		medals = { Gold = seconds(105), Silver = seconds(145), Bronze = seconds(200) },
+		minPossibleMs = seconds(42),
 		checkpointCount = 3,
 		originX = 20000,
-		hasLayout = false,
+		hasLayout = true,
+		requires = "stage_10_finalboss",
 	},
 	{
 		id = "stage_12_extra",
 		order = 12,
-		displayName = "확장 스테이지 II",
+		displayName = "폐기 라인",
 		kind = "Extra",
-		description = "확장용 슬롯.",
+		description = "전 구간 이동식. 멈추면 떨어진다.",
 		allowedActions = { "Pull", "Push" },
-		medals = { Gold = seconds(100), Silver = seconds(140), Bronze = seconds(195) },
-		minPossibleMs = seconds(40),
+		medals = { Gold = seconds(115), Silver = seconds(155), Bronze = seconds(215) },
+		minPossibleMs = seconds(46),
 		checkpointCount = 3,
 		originX = 22000,
-		hasLayout = false,
+		hasLayout = true,
+		requires = "stage_11_extra",
 	},
 }
 

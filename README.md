@@ -53,9 +53,10 @@ src/
 │   ├── Config/
 │   │   ├── GameConfig.luau     기능 플래그, 태그, 콜리전 그룹
 │   │   ├── MagnetConfig.luau   Pull/Push 물리 수치 (서버가 읽는 값)
+│   │   ├── SoundConfig.luau    사운드 목록 + 볼륨/피치
 │   │   ├── StageConfig.luau    12개 스테이지 로스터 + 메달 기준시간
 │   │   └── MonetizationConfig.luau  판매 항목 + Pay-to-win 차단 검증
-│   └── Util/                   Signal, Trove, RateLimiter, TimeFormat
+│   └── Util/                   Signal, Trove, RateLimiter, TimeFormat, SoundKit
 │
 ├── server/                     ServerScriptService.Server
 │   ├── init.server.luau        부팅 순서와 서비스 간 배선
@@ -66,11 +67,13 @@ src/
 │   ├── Run/
 │   │   ├── RunSessionService.luau  서버 권위 타이머, 순서 체크포인트, 검증
 │   │   ├── MovementAudit.luau      비정상 이동 탐지
+│   │   ├── GhostRecorder.luau      주행 궤적 10Hz 기록
 │   │   └── RespawnService.luau     리스폰 대기시간 (스킵 상품의 대상)
 │   ├── Data/
 │   │   ├── DataService.luau        버전 관리되는 프로필 DataStore
 │   │   ├── RecordService.luau      개인 기록·메달 확정
-│   │   └── LeaderboardService.luau OrderedDataStore — 친구 지금, 글로벌 나중
+│   │   ├── LeaderboardService.luau OrderedDataStore — 개인/친구/글로벌
+│   │   └── GhostService.luau       고스트 저장·열람 (열람권 소비)
 │   ├── Combat/
 │   │   ├── EnemyService.luau       자석으로 잡히는 부유 드론
 │   │   ├── CombatService.luau      충돌 속도 기반 데미지
@@ -82,15 +85,19 @@ src/
 │   │   ├── MotionService.luau      움직이는 벽 + 극성 전환
 │   │   ├── GateService.luau        적 전멸/퍼즐 완성 → 문 열림
 │   │   ├── HazardService.luau      낙사·위험지대
-│   │   └── Layouts/                스테이지 10개의 레이아웃 데이터
+│   │   └── Layouts/                스테이지 12개의 레이아웃 데이터
 │   └── Monetization/
 │       ├── MonetizationService.luau  MarketplaceService 연동, 영수증 처리
 │       └── Entitlements.luau         보유 여부 질의의 단일 창구
 │
 └── client/                     StarterPlayer.StarterPlayerScripts.Client
     ├── MagnetController.luau   입력과 조준만 — 판정 없음
+    ├── AudioController.luau    비위치성 피드백 사운드
     ├── State/RunState.luau     서버 타이머의 표시용 보간
-    ├── Effects/MagnetEffects.luau  빔, 트레일
+    ├── Effects/
+    │   ├── MagnetEffects.luau  빔, 트레일
+    │   ├── ImpactEffects.luau  충돌 파티클, 화면 흔들림
+    │   └── GhostPlayer.luau    고스트 실루엣 재생
     └── UI/
         ├── Hud.luau            타이머, 메달 페이스, 쿨다운
         ├── MedalPopup.luau     결과 카드 (무효 사유 포함)
@@ -115,13 +122,13 @@ src/
 | 5 | 나머지 스테이지 제작 | **완료** — 본편 10개 전부 플레이 가능 |
 | 6 | 보스전 2개 | **완료** — 장갑 개폐 패턴, 스크랩 되받아치기, 증원 |
 | 7 | 게임패스/개발자 상품 연동 | **완료** — 자산 ID만 입력하면 동작 |
-| 8 | 폴리싱 | 미착수 — 사운드 없음, 이펙트는 최소 수준 |
+| 8 | 폴리싱 | **완료** — 사운드 배선, 충돌 이펙트, 화면 흔들림, 고스트 리플레이 |
 
 ### 스테이지
 
-본편 10개는 전부 플레이 가능하다. 11·12번은 기획서상 "확장 여유분"이므로 기준시간과 해금
-순서만 잡아두고 지오메트리는 비워 두었다 (`hasLayout = false` → 랭킹판에 "준비 중"으로 뜨고
-서버가 이동 요청을 거부한다).
+12개 전부 플레이 가능하다. 11·12번은 원래 "확장 여유분" 슬롯이었지만 클리어 후 도전
+스테이지로 채웠다 — 로스터는 그냥 배열이라 13번 이후를 덧붙이는 데 아무 제약이 없으므로
+확장 여지가 줄어들지는 않는다.
 
 | ID | 이름 | 가르치는 것 |
 | --- | --- | --- |
@@ -135,6 +142,8 @@ src/
 | `stage_08_foundry` | 주조 공장 | 조립과 타이밍 교대. 리프트를 타고 블록 회수 |
 | `stage_09_miniboss` | 폐기물 수집기 | 장갑이 열린 순간에만 통하는 자석 |
 | `stage_10_finalboss` | 대자석로 | 이동·퍼즐·전투 전부 + 증원 + 움직이는 엄폐물 |
+| `stage_11_extra` | 무중력 격납고 | 바닥 없음. 정지→극성→이동 벽 순서로 재복습 |
+| `stage_12_extra` | 폐기 라인 | 전 구간 이동식. 페리 체인 + 시간 압박 조립 |
 
 ### 스테이지 추가하는 법
 
@@ -154,16 +163,23 @@ src/
 - [`docs/ANTI_CHEAT.md`](docs/ANTI_CHEAT.md) — 기록이 신뢰할 만한 이유, 검증 계층 전체
 - [`docs/MONETIZATION.md`](docs/MONETIZATION.md) — 판매 정책, 자산 ID 연결 방법, 확장 지점
 
+## 남은 것
+
+- **사운드 에셋이 아직 없다.** 배선은 끝났다 — 32개 사운드가 전부 호출 지점에 연결되어 있고
+  `SoundConfig`의 `assetId`가 `0`인 동안에는 조용히 no-op이다. 크리에이터 대시보드에서 만든
+  ID를 그 표에 넣으면 다른 파일을 건드리지 않고 소리가 난다. (게임패스 자산 ID와 같은 방식)
+- **시즌 패스와 리워드 광고는 의도적으로 미구현이다.** 붙을 자리만
+  `MonetizationConfig.PlannedRevenueStreams`에 잡혀 있고, `Validate()`가 그 자리에도
+  Pay-to-win 검사를 건다. 자세한 건 [`docs/MONETIZATION.md`](docs/MONETIZATION.md).
+
 ## 알려진 제약
 
-- **고스트 리플레이는 상품만 정의되어 있고 재생 기능이 없다.** 주행 기록기를 만들기 전까지
-  `GameConfig.Features.GhostReplay`는 꺼둔 상태다.
-- **글로벌 Top 10은 읽기 경로만 잠겨 있다.** 쓰기는 지금부터 동작하므로, 플래그를 켜는 시점에
-  이미 데이터가 쌓여 있다.
-- **사운드가 전혀 없다.** 8단계 폴리싱 작업.
 - **보스의 "코어 뽑기" 판정은 Studio에서 한 번 맞춰봐야 한다.** `BossService`의
   `YANK_DISTANCE`는 AlignPosition 스프링이 실제로 얼마나 늘어나는지에 달려 있어서 코드만으로는
   확정할 수 없다. 스크랩을 되받아쳐서 넣는 쪽이 주된 damage 경로이므로 이 값이 어긋나도 보스를
   못 잡지는 않는다.
 - **스테이지는 서버 전체가 공유한다.** 같은 스테이지를 아무도 달리고 있지 않을 때 퍼즐·적·문이
   초기화된다. 완전한 인스턴싱이 필요해지면 `StageService.ResetStage`가 시작점이다.
+- **12개 스테이지가 항상 동시에 시뮬레이션된다.** 움직이는 벽과 적이 전부 상시 동작하므로,
+  서버 부하가 문제가 되면 플레이어가 없는 스테이지를 잠재우는 것이 첫 번째 최적화 지점이다.
+  (사운드는 이미 근처에 사람이 없으면 재생하지 않는다 — `SoundKit.anyoneNearby`)

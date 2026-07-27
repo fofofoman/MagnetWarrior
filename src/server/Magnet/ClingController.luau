@@ -19,6 +19,7 @@ local RunService = game:GetService("RunService")
 local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
 local MagnetConfig = require(Shared.Config.MagnetConfig)
 local Signal = require(Shared.Util.Signal)
+local SoundKit = require(Shared.Util.SoundKit)
 local Trove = require(Shared.Util.Trove)
 
 local CLING_DISTANCE = 2.6 -- how far the torso floats off the surface
@@ -181,6 +182,7 @@ function ClingController.Engage(player: Player, surface: BasePart, hitPosition: 
 	end))
 
 	states[player] = state
+	SoundKit.PlayAt("ClingAttach", root)
 	ClingController.Engaged:Fire(player, surface)
 	return true
 end
@@ -207,6 +209,10 @@ function ClingController.Release(player: Player, launch: boolean)
 
 	if state.humanoid and state.humanoid.Parent then
 		state.humanoid.AutoRotate = true
+	end
+
+	if state.root and state.root.Parent then
+		SoundKit.PlayAt(if launch then "GrappleLaunch" else "ClingRelease", state.root)
 	end
 
 	if launch and state.root and state.root.Parent then

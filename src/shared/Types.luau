@@ -98,6 +98,23 @@ export type RunUpdate = {
 	rejectReason: string?,
 }
 
+export type GhostScope = "Personal" | "Best"
+
+--- A recorded run. `data` is a flat integer array of
+--- (x, y, z, yawDegrees) quadruples, quantised to one decimal place for
+--- position — see GhostRecorder for why it is stored this way rather than as an
+--- array of CFrames.
+export type GhostPayload = {
+	stageId: string,
+	scope: GhostScope,
+	userId: number,
+	displayName: string,
+	timeMs: number,
+	sampleRate: number,
+	data: { number },
+	unavailableReason: string?,
+}
+
 export type PurchaseCategory = "Cosmetic" | "Convenience" | "Consumable"
 
 --- Every sellable item declares how much it can influence a run. Anything other

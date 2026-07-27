@@ -24,6 +24,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local MonetizationConfig = require(Shared.Config.MonetizationConfig)
 local Net = require(Shared.Net)
 
+local SoundKit = require(Shared.Util.SoundKit)
 local Theme = require(script.Parent.Theme)
 
 local ShopPanel = {}
@@ -108,6 +109,7 @@ local function addActionButton(parent: Instance, text: string, enabled: boolean,
 	create("UICorner", { CornerRadius = UDim.new(0, 7), Parent = button })
 
 	if enabled then
+		Theme.clickable(button)
 		button.Activated:Connect(onClick)
 	end
 	return button
@@ -221,6 +223,7 @@ local function renderCosmetics()
 				Parent = grid,
 			})
 			create("UICorner", { CornerRadius = UDim.new(0, 6), Parent = button })
+			Theme.clickable(button)
 
 			button.Activated:Connect(function()
 				if available then
@@ -339,6 +342,7 @@ local function build()
 			Parent = tabRow,
 		})
 		create("UICorner", { CornerRadius = UDim.new(0, 6), Parent = button })
+		Theme.clickable(button)
 		tabButtons[tab.id] = button
 		button.Activated:Connect(function()
 			setTab(tab.id)
@@ -364,6 +368,7 @@ function ShopPanel.Toggle(open: boolean?)
 	isOpen = if open == nil then not isOpen else open
 	gui.Enabled = isOpen
 	if isOpen then
+		SoundKit.PlayLocal("PanelOpen")
 		render()
 	end
 end

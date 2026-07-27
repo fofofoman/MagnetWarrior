@@ -32,7 +32,9 @@ local TweenService = game:GetService("TweenService")
 
 local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
 local GameConfig = require(Shared.Config.GameConfig)
+local Net = require(Shared.Net)
 local Signal = require(Shared.Util.Signal)
+local SoundKit = require(Shared.Util.SoundKit)
 local Trove = require(Shared.Util.Trove)
 
 local EnemyService = require(script.Parent.EnemyService)
@@ -169,6 +171,17 @@ local function setArmor(state: BossState, open: boolean)
 	state.core:SetAttribute("Invulnerable", not open)
 	state.core.Material = if open then Enum.Material.Neon else Enum.Material.Metal
 
+	-- The armour cycle is the fight's entire rhythm, so both transitions are
+	-- announced loudly: a sound, and a burst at the core the player can read
+	-- from across the arena without watching a health bar.
+	SoundKit.PlayAt(if open then "BossArmorOpen" else "BossArmorClose", state.core.Position)
+	Net.CombatFeedback:FireAllClients({
+		kind = if open then "BossArmorOpen" else "BossArmorClose",
+		position = state.core.Position,
+		magnitude = 1,
+		color = state.core.Color,
+	})
+
 	if open then
 		CollectionService:AddTag(state.core, GameConfig.Tags.Magnetic)
 		BossService.ArmorOpened:Fire(state.stageId, state.spec.id)
@@ -213,6 +226,8 @@ local function throwScrap(state: BossState)
 	-- Lead the shot slightly upward so it arcs instead of grazing the floor.
 	local direction = toTarget.Unit + Vector3.new(0, 0.18, 0)
 	scrap.AssemblyLinearVelocity = direction.Unit * state.spec.throwSpeed
+
+	SoundKit.PlayAt("BossThrow", muzzle)
 
 	local connection
 	connection = scrap.Touched:Connect(function(other: BasePart)
@@ -414,6 +429,13 @@ function BossService.Start()
 				continue
 			end
 			state.alive = false
+			SoundKit.PlayAt("BossDefeated", part.Position)
+			Net.CombatFeedback:FireAllClients({
+				kind = "BossDefeated",
+				position = part.Position,
+				magnitude = 1,
+				color = part.Color,
+			})
 			-- Clear the adds so a defeated boss does not leave escorts behind.
 			EnemyService.ClearGroup(stageId, `{group}_adds`)
 			BossService.Defeated:Fire(stageId, state.spec.id)

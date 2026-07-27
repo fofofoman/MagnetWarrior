@@ -14,6 +14,7 @@ local TweenService = game:GetService("TweenService")
 local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
 local GameConfig = require(Shared.Config.GameConfig)
 local Signal = require(Shared.Util.Signal)
+local SoundKit = require(Shared.Util.SoundKit)
 
 local EnemyService = require(script.Parent.Parent.Combat.EnemyService)
 local PuzzleService = require(script.Parent.PuzzleService)
@@ -73,6 +74,8 @@ local function openGate(state: GateState)
 	TweenService:Create(state.part, TweenInfo.new(OPEN_TIME, Enum.EasingStyle.Quad), {
 		CFrame = target,
 	}):Play()
+
+	SoundKit.PlayAt("GateOpen", state.part.Position)
 
 	GateService.GateOpened:Fire(state.stageId, state.gateId)
 end

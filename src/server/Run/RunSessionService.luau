@@ -29,6 +29,7 @@ local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
 local GameConfig = require(Shared.Config.GameConfig)
 local Net = require(Shared.Net)
 local Signal = require(Shared.Util.Signal)
+local SoundKit = require(Shared.Util.SoundKit)
 local StageConfig = require(Shared.Config.StageConfig)
 local Types = require(Shared.Types)
 
@@ -263,6 +264,7 @@ local function reachCheckpoint(player: Player, run: RunState, info: TriggerInfo,
 	-- centre — checkpoint volumes are tall, and spawning at the top of one drops
 	-- the player from height.
 	checkpointCFrames[player] = part.CFrame - Vector3.new(0, part.Size.Y / 2 - 4, 0)
+	SoundKit.PlayAt("Checkpoint", part.Position)
 
 	pushUpdate(player, {
 		kind = "Checkpoint",

@@ -112,6 +112,7 @@ local function build()
 		Parent = frame,
 	})
 	create("UICorner", { CornerRadius = UDim.new(0, 8), Parent = skipButton })
+	Theme.clickable(skipButton)
 
 	skipButton.Activated:Connect(function()
 		if ShopPanel.ConsumableCount(PRODUCT_KEY) > 0 then

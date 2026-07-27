@@ -27,9 +27,10 @@
 3. DataService                            ← 프로필을 읽는 모든 것보다 먼저
    MonetizationService
 4. 태그 기반 시스템들                      ← 월드가 생기기 전에 (added-signal 수신)
-   MagnetService / EnemyService / CombatService
-   PuzzleService / GateService / HazardService
-5. 런 시스템                              ← RunSessionService, RecordService
+   MagnetService / EnemyService / CombatService / BossService
+   PuzzleService / GateService / MotionService / HazardService
+5. 런 시스템                              ← RunSessionService → RecordService → GhostService
+                                             (GhostService는 RecordService의 신기록 시그널을 듣는다)
 6. 서비스 간 배선                          ← 자석 훅, 체크포인트 저장 패스
 7. StageService                           ← 월드 구축
 8. RespawnService                         ← 허브 SpawnLocation이 존재한 뒤에 스폰 시작
@@ -127,13 +128,52 @@
 | --- | --- | --- |
 | 개인 최고 기록 | 프로필에서 직접 읽기 | 동작 중 |
 | 친구 랭킹 | 친구 목록 → 같은 스토어의 키별 `GetAsync` | 동작 중 |
-| 글로벌 Top 10 | 같은 스토어에 `GetSortedAsync(true, 10)` | **읽기만 잠금** |
+| 글로벌 Top 10 | 같은 스토어에 `GetSortedAsync(true, 10)` | 동작 중 |
 
-글로벌은 마이그레이션도 백필도 필요 없다. `GameConfig.Features.GlobalLeaderboard`를 켜는 것이
-전부다. 쓰기 경로는 처음부터 동작하므로 플래그를 켜는 시점에 데이터가 이미 쌓여 있다.
+글로벌을 켜는 데 마이그레이션도 백필도 필요 없었다. `GameConfig.Features.GlobalLeaderboard`
+플래그 하나였고, 쓰기 경로가 처음부터 돌고 있었으므로 켜는 순간 이미 데이터가 있었다. 이게
+"스키마만 확장 가능하게" 설계해둔 것의 실제 배당금이다.
 
-랭킹판 UI도 이에 맞춰져 있다. 글로벌 탭은 지금도 보이고 선택되며, 서버가 `unavailableReason`을
-돌려주면 그 문구를 그대로 표시한다. 2차 작업은 서버 플래그 하나이고 클라이언트 변경은 없다.
+Top 10에 자기 이름이 없는 페이지는 아무 정보도 주지 않으므로, 서버는 플레이어가 10위 밖일 때
+자기 기록을 `rank = 0`으로 덧붙인다. 클라이언트는 그걸 순위 없는 "내 기록" 행으로 그린다.
+
+### 고스트 리플레이
+
+주행 궤적은 10 Hz로 표본화되어 **정수 평탄 배열**로 저장된다. 이 형식 선택이 기능의 성립
+조건이다.
+
+```
+{ {x=12.3, y=4.5, z=6.7, r=90}, ... }   샘플당 ~40바이트
+{ 123, 45, 67, 90, ... }                 샘플당 ~14바이트
+```
+
+DataStore는 넘겨받은 값을 JSON으로 인코딩하므로, 테이블의 배열은 대부분이 문장부호가 된다.
+6분 주행(3600샘플)이 평탄 배열로는 50 KB 남짓이라 키당 4 MB 한도에 여유가 크다. 위치는
+0.1스터드, 회전은 정수 도(yaw)로 양자화한다 — 반투명 실루엣에는 과할 정도의 정밀도다.
+
+저장 경로는 두 개다. 개인 최고 기록 고스트(무료)와 스테이지 1위 고스트(열람권 소비). 둘 다
+`RecordService.PersonalBestSet`을 듣고 기록되므로, **랭킹을 지키는 검증이 고스트도 지킨다.**
+
+기록기는 "정지 신호"가 아니라 `RunSessionService.GetActiveStageId`로 주행 지속 여부를 확인해
+표본을 남긴다. 주행이 끝나면 더 이상 쌓이지 않지만 버퍼는 남아 있어서, 어떤 핸들러가 먼저
+실행되든 고스트를 가져가는 쪽이 항상 온전한 데이터를 받는다 — 시그널 순서에 의존하지 않는다.
+
+재생 동기화는 `RunState.Elapsed()`, 즉 HUD 타이머와 같은 서버 기준 시각을 쓴다. 클라이언트가
+버벅여도 고스트는 **권위 있는 경과 시간**에 맞춰 달리므로, 뒤처졌다면 실제로 뒤처진 것이다.
+
+### 사운드
+
+`SoundConfig`가 32개 항목을 한곳에 모아두고, `SoundKit`이 양쪽에서 같은 호출 모양을 제공한다.
+
+- **위치 사운드**는 *서버*가 만든다. 그래야 자석 발사·충돌·게이트가 방 안의 모두에게 같은
+  위치에서 들린다. 별도 브로드캐스트 원격이 필요 없다.
+- **비위치 사운드**는 클라이언트 전용이다. 메달 팡파르나 알림음은 듣는 사람이 한 명이다.
+
+`assetId = 0`은 "아직 준비 안 됨"이고 전부 조용한 no-op이 된다. 배선은 완성된 상태이고
+에셋만 채우면 되는데, 이건 게임패스 자산 ID와 정확히 같은 패턴이다.
+
+12개 스테이지가 항상 동시에 돌아가므로 `SoundKit.PlayAt`은 사거리 안에 사람이 없으면 아예
+Sound 인스턴스를 만들지 않는다. 빈 스테이지의 극성 벽이 영원히 인스턴스를 찍어내는 걸 막는다.
 
 ### 프로필 스키마
 

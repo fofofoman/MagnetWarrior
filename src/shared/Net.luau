@@ -32,7 +32,8 @@ local definitions: { [string]: RemoteKind } = {
 	RequestStageTeleport = "Event", -- { stageId }
 
 	-- server → client
-	MagnetFeedback = "Event", -- { hand, action, outcome, targetPart?, hitPosition? }
+	MagnetFeedback = "Event", -- { actor, action, outcome, target?, hitPosition? }
+	CombatFeedback = "Event", -- { kind, position, magnitude, color? }
 	RunUpdate = "Event", -- Types.RunUpdate
 	Notify = "Event", -- { text, tone }
 	EntitlementsChanged = "Event", -- { [productKey]: boolean }
@@ -42,6 +43,7 @@ local definitions: { [string]: RemoteKind } = {
 	GetRecords = "Function",
 	GetLeaderboard = "Function", -- (stageId, scope) -> Types.LeaderboardPayload
 	GetEntitlements = "Function",
+	GetGhost = "Function", -- (stageId, scope) -> Types.GhostPayload?
 }
 
 local Net = {}

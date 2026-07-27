@@ -52,6 +52,8 @@ local layouts: { [string]: StageBuilder.Layout } = {
 	stage_08_foundry = require(script.Parent.Layouts.Stage08Foundry),
 	stage_09_miniboss = require(script.Parent.Layouts.Stage09Miniboss),
 	stage_10_finalboss = require(script.Parent.Layouts.Stage10FinalBoss),
+	stage_11_extra = require(script.Parent.Layouts.Stage11Hangar),
+	stage_12_extra = require(script.Parent.Layouts.Stage12DisposalLine),
 }
 
 local built: { [string]: StageBuilder.BuiltStage } = {}

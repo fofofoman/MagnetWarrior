@@ -31,6 +31,7 @@ local GameConfig = require(Shared.Config.GameConfig)
 local MagnetConfig = require(Shared.Config.MagnetConfig)
 local Net = require(Shared.Net)
 local RateLimiter = require(Shared.Util.RateLimiter)
+local SoundKit = require(Shared.Util.SoundKit)
 local StageConfig = require(Shared.Config.StageConfig)
 local Trove = require(Shared.Util.Trove)
 
@@ -106,7 +107,29 @@ local function getAliveCharacter(player: Player): (Model?, Humanoid?, BasePart?)
 	return character, humanoid, root
 end
 
+--- Magnet audio is positional and server-played rather than local to the actor.
+--- Costs one round trip of latency, but it means every player hears every
+--- magnet in the room, and it matches the beam VFX — which is also drawn from
+--- the server's answer rather than from the local key press.
+local function playActionSound(player: Player, action: string, outcome: string)
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not root then
+		return
+	end
+
+	if outcome == "Rejected" or outcome == "OnCooldown" then
+		SoundKit.PlayAt("MagnetDenied", root)
+	elseif outcome == "NoTarget" then
+		SoundKit.PlayAt("MagnetMiss", root)
+	elseif outcome == "MovedTarget" or outcome == "MovedSelf" then
+		SoundKit.PlayAt(if action == "Pull" then "PullFire" else "PushFire", root)
+	end
+end
+
 local function feedback(player: Player, action: string, outcome: string, target: BasePart?, hitPosition: Vector3?)
+	playActionSound(player, action, outcome)
+
 	local payload = {
 		actor = player,
 		action = action,
