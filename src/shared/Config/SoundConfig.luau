@@ -80,6 +80,9 @@ local definitions: { [string]: SoundDefinition } = {
 	MedalBronze = sound(0, 0.7, 1.0),
 	PersonalBest = sound(0, 0.8, 1.0),
 	PanelOpen = sound(0, 0.4, 1.0),
+	-- Closing is deliberately quieter and lower than opening: the pair reads as
+	-- one gesture rather than two unrelated blips.
+	PanelClose = sound(0, 0.32, 0.88),
 	ButtonClick = sound(0, 0.35, 1.0),
 	Purchase = sound(0, 0.6, 1.0),
 	Notify = sound(0, 0.4, 1.0),

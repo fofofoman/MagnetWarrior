@@ -26,6 +26,7 @@ local Net = require(Shared.Net)
 
 local SoundKit = require(Shared.Util.SoundKit)
 local Theme = require(script.Parent.Theme)
+local UiState = require(script.Parent.UiState)
 
 local ShopPanel = {}
 
@@ -33,6 +34,7 @@ local create = Theme.create
 local player = Players.LocalPlayer
 
 local gui: ScreenGui
+local scrim: TextButton
 local contentList: ScrollingFrame
 local tabButtons: { [string]: TextButton } = {}
 
@@ -262,11 +264,14 @@ local function build()
 		Name = "MagnetWarriorShop",
 		ResetOnSpawn = false,
 		IgnoreGuiInset = true,
+		DisplayOrder = 10, -- panel layer
 		Enabled = false,
 		Parent = player:WaitForChild("PlayerGui"),
 	})
 
-	create("TextButton", {
+	-- Kept as a local: UiState flags it Modal while the panel is up, which is what
+	-- frees the cursor for a player in first person.
+	scrim = create("TextButton", {
 		Name = "Scrim",
 		Size = UDim2.fromScale(1, 1),
 		BackgroundColor3 = Theme.Colors.Background,
@@ -275,7 +280,8 @@ local function build()
 		Text = "",
 		AutoButtonColor = false,
 		Parent = gui,
-	}).Activated:Connect(function()
+	})
+	scrim.Activated:Connect(function()
 		ShopPanel.Toggle(false)
 	end)
 
@@ -365,11 +371,21 @@ local function build()
 end
 
 function ShopPanel.Toggle(open: boolean?)
+	local wasOpen = isOpen
 	isOpen = if open == nil then not isOpen else open
+	if isOpen == wasOpen then
+		return
+	end
+
 	gui.Enabled = isOpen
+
 	if isOpen then
+		UiState.NotifyOpened("Shop")
 		SoundKit.PlayLocal("PanelOpen")
 		render()
+	else
+		UiState.NotifyClosed("Shop")
+		SoundKit.PlayLocal("PanelClose")
 	end
 end
 
@@ -380,6 +396,9 @@ end
 
 function ShopPanel.Start()
 	build()
+	UiState.Register("Shop", function()
+		ShopPanel.Toggle(false)
+	end, scrim)
 	setTab("Shop")
 
 	Net.EntitlementsChanged.OnClientEvent:Connect(function(snapshot)

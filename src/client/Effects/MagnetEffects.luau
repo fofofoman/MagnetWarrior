@@ -207,12 +207,18 @@ local function setupTrail(character: Model)
 	end
 
 	refresh()
-	localPlayer:GetAttributeChangedSignal("Trail"):Connect(refresh)
+
+	-- Both connections belong to *this* character. Without the explicit teardown
+	-- the attribute listener would outlive every respawn, so a long session would
+	-- accumulate one dead listener per death, each still writing to a Trail that
+	-- no longer exists.
+	local attributeConnection = localPlayer:GetAttributeChangedSignal("Trail"):Connect(refresh)
 
 	local connection
 	connection = RunService.Heartbeat:Connect(function()
 		if not root.Parent then
 			connection:Disconnect()
+			attributeConnection:Disconnect()
 			return
 		end
 		local name = localPlayer:GetAttribute("Trail")

@@ -34,6 +34,7 @@ local TimeFormat = require(Shared.Util.TimeFormat)
 local GhostPlayer = require(script.Parent.Parent.Effects.GhostPlayer)
 local SoundKit = require(Shared.Util.SoundKit)
 local Theme = require(script.Parent.Theme)
+local UiState = require(script.Parent.UiState)
 
 local LeaderboardPanel = {}
 
@@ -43,6 +44,7 @@ local player = Players.LocalPlayer
 local SCOPES = { { id = "Personal", label = "개인" }, { id = "Friends", label = "친구" }, { id = "Global", label = "글로벌" } }
 
 local gui: ScreenGui
+local scrim: TextButton
 local root: Frame
 local stageList: ScrollingFrame
 local entryList: ScrollingFrame
@@ -51,6 +53,7 @@ local medalLabel: TextLabel
 local statusLabel: TextLabel
 local teleportButton: TextButton
 local ghostStatus: TextLabel
+local ghostClearButton: TextButton
 local ghostButtons: { TextButton } = {}
 local scopeButtons: { [string]: TextButton } = {}
 
@@ -76,13 +79,21 @@ end
 local function renderEntries(payload: any)
 	clear(entryList)
 
-	if not payload then
+	-- Anything other than a well-formed payload is a failure to report, not a
+	-- reason to error out — an error here happens inside a spawned thread and
+	-- would leave the board stuck on "불러오는 중…" with no way back.
+	if typeof(payload) ~= "table" then
 		statusLabel.Text = "랭킹을 불러오지 못했습니다."
 		return
 	end
 
 	if payload.unavailableReason then
 		statusLabel.Text = payload.unavailableReason
+		return
+	end
+
+	if typeof(payload.entries) ~= "table" then
+		statusLabel.Text = "랭킹을 불러오지 못했습니다."
 		return
 	end
 
@@ -227,13 +238,23 @@ local function selectStage(stageId: string)
 		button.TextColor3 = if canPlay then Theme.Colors.Text else Theme.Colors.TextDim
 	end
 
-	local ghost = GhostPlayer.LoadedFor(stageId)
+	LeaderboardPanel.RefreshGhostStatus()
+
+	requestBoard()
+end
+
+--- A loaded ghost is sticky by design, so the panel has to show what is loaded
+--- *and* offer a way out of it. Without the off switch the only way to stop
+--- racing a ghost was to rejoin the game.
+function LeaderboardPanel.RefreshGhostStatus()
+	local stageId = selectedStageId
+	local ghost = stageId and GhostPlayer.LoadedFor(stageId)
+
 	ghostStatus.Text = if ghost
 		then `고스트: {ghost.displayName} · {TimeFormat.Short(ghost.timeMs)}`
 		else "고스트 없음 — 불러오면 다음 주행에 함께 달립니다"
 	ghostStatus.TextColor3 = if ghost then Theme.Colors.Accent else Theme.Colors.TextDim
-
-	requestBoard()
+	ghostClearButton.Visible = ghost ~= nil
 end
 
 local function renderRoster()
@@ -304,6 +325,7 @@ local function renderRoster()
 			Parent = row,
 		})
 
+		Theme.clickable(row)
 		row.Activated:Connect(function()
 			selectStage(entry.id)
 		end)
@@ -343,11 +365,14 @@ local function build()
 		Name = "MagnetWarriorBoard",
 		ResetOnSpawn = false,
 		IgnoreGuiInset = true,
+		DisplayOrder = 10, -- panel layer
 		Enabled = false,
 		Parent = player:WaitForChild("PlayerGui"),
 	})
 
-	create("TextButton", {
+	-- Kept as a local: UiState flags it Modal while the panel is up, which is what
+	-- frees the cursor for a player in first person.
+	scrim = create("TextButton", {
 		Name = "Scrim",
 		Size = UDim2.fromScale(1, 1),
 		BackgroundColor3 = Theme.Colors.Background,
@@ -356,7 +381,8 @@ local function build()
 		Text = "",
 		AutoButtonColor = false,
 		Parent = gui,
-	}).Activated:Connect(function()
+	})
+	scrim.Activated:Connect(function()
 		LeaderboardPanel.Toggle(false)
 	end)
 
@@ -519,9 +545,9 @@ local function build()
 	})
 
 	ghostStatus = create("TextLabel", {
-		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -92),
-		Size = UDim2.new(1, -32, 0, 16),
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0, 16, 1, -92),
+		Size = UDim2.new(1, -96, 0, 16),
 		BackgroundTransparency = 1,
 		Font = Theme.Font,
 		Text = "",
@@ -531,6 +557,32 @@ local function build()
 		TextTruncate = Enum.TextTruncate.AtEnd,
 		Parent = boardFrame,
 	})
+
+	ghostClearButton = create("TextButton", {
+		Name = "ClearGhost",
+		AnchorPoint = Vector2.new(1, 1),
+		Position = UDim2.new(1, -16, 1, -90),
+		Size = UDim2.fromOffset(58, 20),
+		BackgroundColor3 = Theme.Colors.PanelRaised,
+		BorderSizePixel = 0,
+		Font = Theme.Font,
+		Text = "해제",
+		TextColor3 = Theme.Colors.TextDim,
+		TextSize = 11,
+		Visible = false,
+		Parent = boardFrame,
+	})
+	create("UICorner", { CornerRadius = UDim.new(0, 5), Parent = ghostClearButton })
+	Theme.clickable(ghostClearButton)
+
+	ghostClearButton.Activated:Connect(function()
+		local stageId = selectedStageId
+		if not stageId then
+			return
+		end
+		GhostPlayer.Clear(stageId)
+		LeaderboardPanel.RefreshGhostStatus()
+	end)
 
 	local ghostRow = create("Frame", {
 		AnchorPoint = Vector2.new(0.5, 1),
@@ -584,8 +636,7 @@ local function build()
 					ghostStatus.Text = payload.unavailableReason
 					ghostStatus.TextColor3 = Theme.Colors.Warn
 				else
-					ghostStatus.Text = `고스트: {payload.displayName} · {TimeFormat.Short(payload.timeMs)}`
-					ghostStatus.TextColor3 = Theme.Colors.Accent
+					LeaderboardPanel.RefreshGhostStatus()
 				end
 			end)
 		end)
@@ -621,16 +672,31 @@ local function build()
 end
 
 function LeaderboardPanel.Toggle(open: boolean?)
+	local wasOpen = isOpen
 	isOpen = if open == nil then not isOpen else open
+	if isOpen == wasOpen then
+		return
+	end
+
 	gui.Enabled = isOpen
+
 	if isOpen then
+		-- Announce before refreshing: UiState closes whatever else was up and
+		-- disarms the magnet, and neither should wait on a DataStore read.
+		UiState.NotifyOpened("Board")
 		SoundKit.PlayLocal("PanelOpen")
 		refresh()
+	else
+		UiState.NotifyClosed("Board")
+		SoundKit.PlayLocal("PanelClose")
 	end
 end
 
 function LeaderboardPanel.Start()
 	build()
+	UiState.Register("Board", function()
+		LeaderboardPanel.Toggle(false)
+	end, scrim)
 
 	ContextActionService:BindAction("ToggleBoard", function(_, inputState)
 		if inputState == Enum.UserInputState.Begin then

@@ -544,6 +544,10 @@ function MagnetService.ClearPlayerState(player: Player)
 end
 
 function MagnetService.Start()
+	if heartbeat then
+		return -- already running; a Studio re-run must not double-connect
+	end
+
 	MagneticRegistry.Start()
 	ClingController.Start()
 

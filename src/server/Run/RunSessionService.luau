@@ -97,10 +97,6 @@ function RunSessionService.GetActiveStageId(player: Player): string?
 	return run and run.stageId
 end
 
-function RunSessionService.GetRunState(player: Player): RunState?
-	return runs[player]
-end
-
 function RunSessionService.GetCheckpointCFrame(player: Player): CFrame?
 	return checkpointCFrames[player]
 end

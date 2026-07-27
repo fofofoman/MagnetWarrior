@@ -21,6 +21,7 @@ local Net = require(Shared.Net)
 local StageConfig = require(Shared.Config.StageConfig)
 local TimeFormat = require(Shared.Util.TimeFormat)
 
+local MagnetController = require(script.Parent.Parent.MagnetController)
 local RunState = require(script.Parent.Parent.State.RunState)
 local Theme = require(script.Parent.Theme)
 
@@ -29,20 +30,18 @@ local MedalPopup = {}
 local create = Theme.create
 local player = Players.LocalPlayer
 
-local HOLD_SECONDS = 6
-
 local card: Frame
 local medalLabel: TextLabel
 local titleLabel: TextLabel
 local timeLabel: TextLabel
 local deltaLabel: TextLabel
-local hideToken = 0
 
 local function build()
 	local gui = create("ScreenGui", {
 		Name = "MagnetWarriorResult",
 		ResetOnSpawn = false,
 		IgnoreGuiInset = true,
+		DisplayOrder = 5, -- above the HUD, below a panel the player opened on top
 		Parent = player:WaitForChild("PlayerGui"),
 	})
 
@@ -145,11 +144,43 @@ local function build()
 		Net.RequestStageTeleport:FireServer({ stageId = "hub" })
 		MedalPopup.Hide()
 	end)
+
+	-- The card no longer times out, so it needs an explicit way out for a player
+	-- who wants neither button.
+	local closeButton = create("TextButton", {
+		Name = "Close",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -12, 0, 12),
+		Size = UDim2.fromOffset(24, 24),
+		BackgroundTransparency = 1,
+		Font = Theme.FontBold,
+		Text = "×",
+		TextColor3 = Theme.Colors.TextDim,
+		TextSize = 18,
+		Parent = card,
+	})
+	Theme.clickable(closeButton)
+	closeButton.Activated:Connect(function()
+		MedalPopup.Hide()
+	end)
+
+	-- The card is not modal — the player can walk off while it is up — so instead
+	-- of freezing the magnet for its whole life, it only disarms while the cursor
+	-- is actually over it. Clicking "다시 도전" should not also fire a Pull at
+	-- whatever happens to be behind the card.
+	card.MouseEnter:Connect(function()
+		MagnetController.SetSuppressed("ResultCard", true)
+	end)
+	card.MouseLeave:Connect(function()
+		MagnetController.SetSuppressed("ResultCard", false)
+	end)
 end
 
 function MedalPopup.Hide()
-	hideToken += 1
 	card.Visible = false
+	-- Hiding under the cursor means MouseLeave never fires, which would leave the
+	-- magnet disarmed for the rest of the session.
+	MagnetController.SetSuppressed("ResultCard", false)
 end
 
 local function show(update)
@@ -192,26 +223,23 @@ local function show(update)
 	TweenService:Create(card, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
 		Position = UDim2.fromScale(0.5, 0.42),
 	}):Play()
-
-	hideToken += 1
-	local token = hideToken
-	task.delay(HOLD_SECONDS, function()
-		if hideToken == token then
-			card.Visible = false
-		end
-	end)
 end
 
 function MedalPopup.Start()
 	build()
 
-	RunState.Finished:Connect(function(update)
-		-- Aborts are already communicated by the HUD flash; only a completed
-		-- attempt (clean or rejected) earns a card.
-		if update.kind ~= "Finished" then
-			return
+	RunState.Changed:Connect(function(update)
+		if update.kind == "Finished" then
+			-- Aborts are already communicated by the HUD flash; only a completed
+			-- attempt (clean or rejected) earns a card.
+			show(update)
+		elseif update.kind == "Started" then
+			-- The card used to vanish on a timer, which meant its own "다시 도전"
+			-- button disappeared out from under a player who was still reading the
+			-- split. It stays now, and the next run is what dismisses it — which is
+			-- the one moment it is certainly no longer wanted.
+			MedalPopup.Hide()
 		end
-		show(update)
 	end)
 end
 

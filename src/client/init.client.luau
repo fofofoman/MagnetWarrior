@@ -23,12 +23,28 @@ local RespawnPrompt = require(script.UI.RespawnPrompt)
 local RunState = require(script.State.RunState)
 local ShopPanel = require(script.UI.ShopPanel)
 local Toast = require(script.UI.Toast)
+local UiState = require(script.UI.UiState)
 
 local player = Players.LocalPlayer
 
 local function main()
 	-- State before UI: the panels subscribe to RunState on construction.
 	RunState.Start()
+
+	-- A menu owns the screen exclusively: while one is open the magnet is
+	-- disarmed and whatever it was holding is released, so browsing the shop can
+	-- never launch you across the room.
+	UiState.SetSuppressionHandler(function(active: boolean)
+		MagnetController.SetSuppressed("Menu", active)
+	end)
+
+	-- The timer is authoritative and does not pause for a menu. If a run starts
+	-- while a panel is up, the panel is the thing that has to go.
+	RunState.Changed:Connect(function(update)
+		if update.kind == "Started" then
+			UiState.CloseAll()
+		end
+	end)
 
 	MagnetController.Start()
 	MagnetEffects.Start()

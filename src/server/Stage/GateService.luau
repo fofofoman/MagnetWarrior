@@ -32,6 +32,8 @@ type GateState = {
 	openByGroup: string,
 	closedCFrame: CFrame,
 	open: boolean,
+	--- The in-flight open animation, kept so a reset can cancel it.
+	tween: Tween?,
 }
 
 local gates: { [BasePart]: GateState } = {}
@@ -57,6 +59,7 @@ local function register(instance: Instance)
 		openByGroup = instance:GetAttribute("OpenByGroup") or "default",
 		closedCFrame = instance.CFrame,
 		open = false,
+		tween = nil,
 	}
 end
 
@@ -71,9 +74,11 @@ local function openGate(state: GateState)
 	local target = state.closedCFrame - Vector3.new(0, state.part.Size.Y + 1, 0)
 	state.part.CanCollide = false
 
-	TweenService:Create(state.part, TweenInfo.new(OPEN_TIME, Enum.EasingStyle.Quad), {
+	local tween = TweenService:Create(state.part, TweenInfo.new(OPEN_TIME, Enum.EasingStyle.Quad), {
 		CFrame = target,
-	}):Play()
+	})
+	state.tween = tween
+	tween:Play()
 
 	SoundKit.PlayAt("GateOpen", state.part.Position)
 
@@ -84,6 +89,16 @@ local function closeGate(state: GateState)
 	if not state.part.Parent then
 		return
 	end
+
+	-- Cancel first. A stage reset that lands inside the 0.6s slide would otherwise
+	-- leave the tween running after the CFrame was restored, dragging the gate
+	-- back into the floor while this function has already marked it solid and
+	-- closed — a barrier that is not there, which quietly skips a whole room.
+	if state.tween then
+		state.tween:Cancel()
+		state.tween = nil
+	end
+
 	state.open = false
 	state.part.CFrame = state.closedCFrame
 	state.part.CanCollide = true

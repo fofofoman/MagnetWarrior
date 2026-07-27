@@ -295,22 +295,6 @@ function DataService.Get(player: Player): Profile?
 	return profiles[player]
 end
 
---- Yields until the profile is available, or the timeout expires.
-function DataService.WaitFor(player: Player, timeout: number?): Profile?
-	local deadline = os.clock() + (timeout or 15)
-	while os.clock() < deadline do
-		local profile = profiles[player]
-		if profile then
-			return profile
-		end
-		if not player.Parent then
-			return nil
-		end
-		task.wait(0.1)
-	end
-	return profiles[player]
-end
-
 local function onPlayerAdded(player: Player)
 	if loading[player] then
 		return
@@ -348,8 +332,20 @@ function DataService.Start()
 	task.spawn(function()
 		while true do
 			task.wait(AUTOSAVE_INTERVAL)
+
+			-- Snapshot first. saveProfile yields on UpdateAsync, and a player
+			-- leaving during that yield clears their row — mutating the table
+			-- mid-traversal, which throws "invalid key to 'next'" and would kill
+			-- the autosave loop for the rest of the server's life.
+			local pending: { Player } = {}
 			for player in profiles do
-				saveProfile(player, false)
+				table.insert(pending, player)
+			end
+
+			for _, player in pending do
+				if profiles[player] then
+					saveProfile(player, false)
+				end
 			end
 		end
 	end)

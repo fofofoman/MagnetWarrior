@@ -41,6 +41,12 @@ selene src/                              # 린트
 | Tab / 게임패드 Select | 스테이지 & 랭킹판 |
 | B / 게임패드 Y | 상점 & 외형 |
 
+키보드에서는 같은 내용이 화면 하단 힌트 줄에도 뜬다 (주행 중에는 숨겨진다). 터치·게임패드는
+ContextActionService가 라벨 붙은 버튼을 직접 그린다.
+
+패널은 한 번에 하나만 열린다. 열려 있는 동안 자석은 잠기고 — 잡고 있던 것도 놓는다 — 커서는
+풀린다. 상점 버튼을 누르는 것이 뒤에 있는 벽을 당기는 일이 되면 안 되기 때문이다.
+
 ---
 
 ## 프로젝트 구조
@@ -101,7 +107,8 @@ src/
     │   ├── ImpactEffects.luau  충돌 파티클, 화면 흔들림
     │   └── GhostPlayer.luau    고스트 실루엣 재생
     └── UI/
-        ├── Hud.luau            타이머, 메달 페이스, 쿨다운
+        ├── Hud.luau            타이머, 메달 페이스, 쿨다운, 조작 힌트
+        ├── UiState.luau        패널 하나만 열림 + 열린 동안 자석 잠금
         ├── MedalPopup.luau     결과 카드 (무효 사유 포함)
         ├── LeaderboardPanel.luau  스테이지 선택 + 개인/친구/글로벌
         ├── ShopPanel.luau      게임패스·아이템 구매, 외형 선택
@@ -195,6 +202,15 @@ require(game.ServerScriptService.Server.Data.MedalCalibration).ProposeConfig()
 
 p20/p50/p80과 현재 기준시간을 나란히 보여주고, 붙여넣을 수 있는 `StageConfig` 줄을 뽑아준다.
 스테이지당 100회 정도 쌓이기 전에는 참고만 하면 된다.
+
+**스테이지 슬립 상태 확인.** 12개 스테이지가 한 월드에 동시에 존재하고, 아무도 근처에 없는
+스테이지는 시뮬레이션을 멈춘다. 벽이 안 움직이거나 적이 안 오는 것 같으면 먼저 이걸 본다:
+
+```lua
+require(game.ServerScriptService.Server.Stage.StageActivity).AwakeStages()
+```
+
+깨어 있는 스테이지 목록을 돌려준다. 비어 있으면 아무도 어느 스테이지에도 없다는 뜻이다.
 
 ### 알아둘 것
 

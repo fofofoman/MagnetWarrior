@@ -189,10 +189,6 @@ function PuzzleService.ResetStage(stageId: string)
 	end
 end
 
-function PuzzleService.IsGroupComplete(stageId: string, group: string): boolean
-	return completedGroups[groupKey(stageId, group)] == true
-end
-
 function PuzzleService.Start()
 	for _, instance in CollectionService:GetTagged(GameConfig.Tags.PuzzleSocket) do
 		registerSocket(instance)

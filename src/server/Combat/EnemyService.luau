@@ -158,10 +158,6 @@ local function countGroup(stageId: string, group: string): number
 	return count
 end
 
-function EnemyService.GetAliveCount(stageId: string, group: string): number
-	return countGroup(stageId, group)
-end
-
 function EnemyService.Spawn(kindName: string, position: Vector3, stageId: string, group: string?): BasePart?
 	local kind = kinds[kindName]
 	if not kind then

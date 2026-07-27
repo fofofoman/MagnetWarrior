@@ -96,20 +96,65 @@ end
 --- is enforced server-side and this cannot shorten it.
 local nextAllowed = { Pull = 0, Push = 0 }
 
+--- Sources currently asking for the magnet to be held off — a menu that owns the
+--- screen, a result card the cursor is resting on. Counted by source rather than
+--- stored as one flag, so a card releasing its claim cannot re-arm the magnet
+--- underneath an open panel.
+local suppressors: { [string]: boolean } = {}
+local suppressed = false
+
+--- Which hands are currently held down, so suppression can release them. A Pull
+--- held when the board opens is a live grapple on the server; dropping the
+--- suppression without an End would leave the player flying while they read.
+local held = { Pull = false, Push = false }
+
 local function handleAction(action: string, inputState: Enum.UserInputState): Enum.ContextActionResult
 	if inputState == Enum.UserInputState.Begin then
+		if suppressed then
+			-- Pass rather than Sink: the click belongs to the UI underneath.
+			return Enum.ContextActionResult.Pass
+		end
+
 		local now = os.clock()
 		if now < nextAllowed[action] then
 			return Enum.ContextActionResult.Sink
 		end
 		nextAllowed[action] = now
 			+ (if action == "Pull" then MagnetConfig.PullCooldown else MagnetConfig.PushCooldown)
+		held[action] = true
 		fire(action, "Begin")
 	elseif inputState == Enum.UserInputState.End then
+		if not held[action] then
+			return Enum.ContextActionResult.Pass
+		end
+		held[action] = false
 		fire(action, "End")
 	end
 
 	return Enum.ContextActionResult.Sink
+end
+
+--- Turns the magnet off while UI wants the click, and lets go of anything held.
+--- @param source who is asking; the magnet stays off until every source releases
+function MagnetController.SetSuppressed(source: string, value: boolean)
+	suppressors[source] = value or nil
+
+	local wanted = next(suppressors) ~= nil
+	if suppressed == wanted then
+		return
+	end
+	suppressed = wanted
+
+	if not suppressed then
+		return
+	end
+
+	for action, isHeld in held do
+		if isHeld then
+			held[action] = false
+			fire(action, "End")
+		end
+	end
 end
 
 --- Remaining cooldown for a hand, 0..1, for the HUD to render.
@@ -139,6 +184,8 @@ function MagnetController.Start()
 	-- Dropping the character mid-pull would otherwise leave the server holding a
 	-- grapple that never gets released.
 	player.CharacterRemoving:Connect(function()
+		held.Pull = false
+		held.Push = false
 		fire("Pull", "End")
 	end)
 end

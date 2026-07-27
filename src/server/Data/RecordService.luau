@@ -60,20 +60,49 @@ local function isCompleted(record: Types.StageRecord?): boolean
 	return record ~= nil and record.completions > 0 and record.bestTimeMs > 0
 end
 
+--- Sends the client its result card. Called on every accepted finish, including
+--- the ones nothing could be stored for: the HUD hides its run panel on this
+--- update, so a finish that never sends one leaves the player's timer running
+--- against a run the server has already forgotten.
+local function sendFinished(
+	player: Player,
+	stageId: string,
+	timeMs: number,
+	medal: Types.MedalTier,
+	isPersonalBest: boolean,
+	previousBestMs: number?,
+	splitCount: number
+)
+	local update: Types.RunUpdate = {
+		kind = "Finished",
+		stageId = stageId,
+		elapsedMs = timeMs,
+		medal = medal,
+		isPersonalBest = isPersonalBest,
+		previousBestMs = previousBestMs,
+		checkpointIndex = splitCount,
+		checkpointTotal = splitCount,
+	}
+	Net.RunUpdate:FireClient(player, update)
+end
+
 local function onRunFinished(player: Player, result: any)
 	if not result.valid then
 		return -- RunSessionService already told the client why
 	end
 
-	local profile = DataService.Get(player)
-	if not profile then
-		warn(`[RecordService] {player.Name} finished {result.stageId} with no loaded profile`)
-		return
-	end
-
 	local stageId = result.stageId
 	local timeMs = result.timeMs
 	local runMedal = StageConfig.MedalFor(stageId, timeMs)
+
+	local profile = DataService.Get(player)
+	if not profile then
+		warn(`[RecordService] {player.Name} finished {stageId} with no loaded profile`)
+		-- Nothing can be stored, but the run genuinely happened and the medal is
+		-- pure config. Show it rather than stranding the HUD.
+		sendFinished(player, stageId, timeMs, runMedal, false, nil, #result.splits)
+		return
+	end
 
 	local record = profile.records[stageId]
 	local previousBest: number? = if isCompleted(record) then record.bestTimeMs else nil
@@ -116,17 +145,7 @@ local function onRunFinished(player: Player, result: any)
 		end)
 	end
 
-	local update: Types.RunUpdate = {
-		kind = "Finished",
-		stageId = stageId,
-		elapsedMs = timeMs,
-		medal = runMedal,
-		isPersonalBest = isPersonalBest,
-		previousBestMs = previousBest,
-		checkpointIndex = #result.splits,
-		checkpointTotal = #result.splits,
-	}
-	Net.RunUpdate:FireClient(player, update)
+	sendFinished(player, stageId, timeMs, runMedal, isPersonalBest, previousBest, #result.splits)
 end
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -223,7 +242,28 @@ end
 
 function RecordService.Start()
 	RunSessionService.Started:Connect(onRunStarted)
-	RunSessionService.Finished:Connect(onRunFinished)
+
+	-- Guarded: this handler runs on its own thread, so an error inside it would
+	-- otherwise be printed and dropped — and the player would be left watching a
+	-- timer for a run that had already ended on the server.
+	RunSessionService.Finished:Connect(function(player: Player, result: any)
+		local ok, err = pcall(onRunFinished, player, result)
+		if ok then
+			return
+		end
+		warn(`[RecordService] finish handler failed for {player.Name}: {err}`)
+		if result.valid then
+			sendFinished(
+				player,
+				result.stageId,
+				result.timeMs,
+				StageConfig.MedalFor(result.stageId, result.timeMs),
+				false,
+				nil,
+				#result.splits
+			)
+		end
+	end)
 
 	Net.GetRecords.OnServerInvoke = function(player: Player)
 		return getRecords(player)

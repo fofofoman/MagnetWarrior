@@ -28,7 +28,12 @@ local HAZARD_COOLDOWN = 1
 
 local killPlanes: { [BasePart]: true } = {}
 local hazardConnections: { [BasePart]: RBXScriptConnection } = {}
-local lastHazardHit: { [Humanoid]: number } = {}
+
+--- Weak-keyed on purpose. Every respawn produces a new Humanoid, and a strong
+--- table here would hold one entry per death for the lifetime of the server.
+--- Nothing else references these humanoids once the character is gone, so weak
+--- keys let the whole table drain by itself.
+local lastHazardHit: { [Humanoid]: number } = setmetatable({}, { __mode = "k" }) :: any
 
 local function humanoidOf(part: BasePart): Humanoid?
 	local model = part:FindFirstAncestorOfClass("Model")

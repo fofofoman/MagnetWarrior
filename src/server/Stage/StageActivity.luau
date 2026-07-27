@@ -30,7 +30,6 @@ local CHECK_RATE = 2 -- Hz; stages are 2000 studs apart, nobody crosses that fas
 --- Stages are spaced along X, so a scalar origin is all the comparison needs.
 local origins: { [string]: number } = {}
 local awake: { [string]: boolean } = {}
-local anyPlayers = false
 
 --- Registered by StageService as it builds each stage.
 function StageActivity.Register(stageId: string, originX: number)
@@ -51,21 +50,6 @@ function StageActivity.IsAwake(stageId: string?): boolean
 	return awake[stageId] == true
 end
 
---- For systems that know a world position but not which stage it belongs to.
-function StageActivity.IsPositionAwake(position: Vector3): boolean
-	if not anyPlayers then
-		return false
-	end
-	for _, player in Players:GetPlayers() do
-		local character = player.Character
-		local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-		if root and math.abs(root.Position.X - position.X) <= WAKE_RADIUS then
-			return true
-		end
-	end
-	return false
-end
-
 local function refresh()
 	local positions: { number } = {}
 	for _, player in Players:GetPlayers() do
@@ -75,8 +59,6 @@ local function refresh()
 			table.insert(positions, root.Position.X)
 		end
 	end
-
-	anyPlayers = #positions > 0
 
 	for stageId, originX in origins do
 		local near = false

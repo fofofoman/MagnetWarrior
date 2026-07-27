@@ -29,6 +29,17 @@ local LeaderboardService = {}
 
 local STORE_PREFIX = "StageTimes_v1_"
 local MAX_FRIENDS_SCANNED = 60
+
+--- Hard ceiling on how long a friend board may take to assemble.
+---
+--- Each friend costs one GetAsync, and awaitBudget will sit on a nearly-spent
+--- request budget for up to eight seconds per call. Sixty friends on a busy
+--- server is therefore minutes of blocking, during which the player's panel is
+--- stuck on "불러오는 중…" with no way to cancel. A partial board that arrives is
+--- worth far more than a complete one that never does, so the scan stops here and
+--- ranks whoever it managed to read.
+local FRIEND_SCAN_DEADLINE = 6 -- seconds
+
 local FRIEND_CACHE_SECONDS = 60
 local GLOBAL_CACHE_SECONDS = 45
 local GLOBAL_TOP_COUNT = 10
@@ -228,7 +239,16 @@ function LeaderboardService.GetFriendBoard(player: Player, stageId: string): Typ
 	end
 
 	local rows: { { userId: number, timeMs: number } } = {}
-	for _, userId in userIds do
+	local deadline = os.clock() + FRIEND_SCAN_DEADLINE
+	local truncated = false
+
+	for index, userId in userIds do
+		-- The player's own row is first and is always read; past that, stop as
+		-- soon as the budget for this request is spent.
+		if index > 1 and os.clock() >= deadline then
+			truncated = true
+			break
+		end
 		local timeMs = LeaderboardService.GetTime(userId, stageId)
 		if timeMs then
 			table.insert(rows, { userId = userId, timeMs = timeMs })
@@ -241,7 +261,11 @@ function LeaderboardService.GetFriendBoard(player: Player, stageId: string): Typ
 		entries = buildEntries(rows, stageId),
 	}
 
-	friendCache[cacheKey] = { at = os.clock(), payload = payload }
+	-- A truncated board is not cached: caching it would freeze a partial answer in
+	-- place for a minute, and the next open should get another try at the rest.
+	if not truncated then
+		friendCache[cacheKey] = { at = os.clock(), payload = payload }
+	end
 	return payload
 end
 

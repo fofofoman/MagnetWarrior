@@ -331,8 +331,4 @@ function StageService.Start()
 	end)
 end
 
-function StageService.GetHubSpawn(): CFrame
-	return hubSpawn
-end
-
 return StageService

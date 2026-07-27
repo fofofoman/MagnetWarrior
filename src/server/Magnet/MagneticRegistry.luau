@@ -77,7 +77,11 @@ local function register(instance: Instance)
 		isSurface = CollectionService:HasTag(instance, GameConfig.Tags.MagneticSurface),
 		lastImpulseAt = 0,
 		lastImpulseBy = nil,
-		lastDamageAt = {},
+		-- Weak-keyed: this accumulates one entry per distinct thing the part has
+		-- ever touched. A crate in a busy arena meets a new enemy every wave, and
+		-- those enemies are destroyed — a strong table would pin every corpse it
+		-- ever hit for as long as the crate exists.
+		lastDamageAt = setmetatable({}, { __mode = "k" }) :: any,
 	}
 
 	claimServerOwnership(instance)

@@ -131,14 +131,6 @@ function Entitlements.AddConsumable(player: Player, key: string, amount: number)
 	return true
 end
 
-function Entitlements.GetConsumable(player: Player, key: string): number
-	local profile = DataService.Get(player)
-	if not profile then
-		return 0
-	end
-	return profile.consumables[key] or 0
-end
-
 --- Spends one, returning false if there was nothing to spend.
 function Entitlements.ConsumeOne(player: Player, key: string): boolean
 	local profile = DataService.Get(player)
@@ -179,17 +171,39 @@ function Entitlements.Invalidate(player: Player)
 	passCache[player] = nil
 end
 
+--- Records a pass as owned without asking Roblox.
+---
+--- Only ever called from PromptGamePassPurchaseFinished, and it exists because
+--- `UserOwnsGamePassAsync` frequently still answers *false* in the seconds after
+--- a purchase completes. Re-querying there would cache that stale false for
+--- PASS_CACHE_SECONDS, so a player who had just paid for the colour pack would
+--- watch the swatches stay locked for two minutes. The purchase-finished event
+--- is the more authoritative signal at that instant; the cache still expires
+--- normally afterwards, so a refund is picked up on the next miss.
+local function markOwned(player: Player, key: string)
+	local cache = passCache[player]
+	if not cache then
+		cache = {}
+		passCache[player] = cache
+	end
+	cache[key] = { owned = true, at = os.clock() }
+end
+
 function Entitlements.Start()
 	MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player, passId, wasPurchased)
 		if not wasPurchased then
 			return
 		end
-		Entitlements.Invalidate(player)
 
 		local product = MonetizationConfig.FindGamePassByAssetId(passId)
 		if product then
+			markOwned(player, product.key)
 			Net.Notify:FireClient(player, { text = `{product.displayName} 구매 완료!`, tone = "Good" })
+		else
+			-- Unknown asset: no key to mark, so fall back to a re-query.
+			Entitlements.Invalidate(player)
 		end
+
 		Entitlements.Changed:Fire(player, Entitlements.Snapshot(player))
 	end)
 

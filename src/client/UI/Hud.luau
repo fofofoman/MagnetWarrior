@@ -22,6 +22,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Net = require(Shared.Net)
@@ -48,6 +49,7 @@ local pullBar: Frame
 local pushBar: Frame
 local runFrame: Frame
 local crosshair: Frame
+local hintFrame: Frame
 
 --- Personal bests, so the pace chip has something to fall back on. Refreshed on
 --- start and after every finish.
@@ -101,6 +103,11 @@ local function buildGui()
 		ResetOnSpawn = false,
 		IgnoreGuiInset = true,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+		-- Bottom of the stack. Sibling ScreenGuis with an equal DisplayOrder render
+		-- in an order nothing here controls, which is how a purchase toast fired
+		-- from inside the shop could end up behind the shop's own backdrop. Every
+		-- client ScreenGui states its layer explicitly; see UiState.
+		DisplayOrder = 0,
 		Parent = player:WaitForChild("PlayerGui"),
 	})
 
@@ -248,6 +255,61 @@ local function buildGui()
 
 	pullBar = makeHand("Pull", "왼손 PULL", Theme.Colors.Accent, 0)
 	pushBar = makeHand("Push", "오른손 PUSH", Theme.Colors.AccentWarm, 24)
+
+	-- Key hints. On touch and gamepad, ContextActionService already draws labelled
+	-- buttons for every bound action; on a keyboard it draws nothing, so without
+	-- this a new player has no way to discover that the stage list exists at all.
+	-- Shown out of a run and hidden during one, because a timed run wants a clean
+	-- screen and by then the player knows the keys.
+	hintFrame = create("Frame", {
+		Name = "Hints",
+		AnchorPoint = Vector2.new(0.5, 1),
+		-- Sits above the hand cooldown bars rather than beside them: centred on a
+		-- narrow window the strip would otherwise reach back into the bottom-left
+		-- corner they occupy.
+		Position = UDim2.new(0.5, 0, 1, -76),
+		Size = UDim2.fromOffset(450, 28),
+		BackgroundColor3 = Theme.Colors.Panel,
+		BackgroundTransparency = 0.35,
+		BorderSizePixel = 0,
+		Visible = UserInputService.KeyboardEnabled,
+		Parent = gui,
+	}, {
+		create("UIListLayout", {
+			FillDirection = Enum.FillDirection.Horizontal,
+			HorizontalAlignment = Enum.HorizontalAlignment.Center,
+			VerticalAlignment = Enum.VerticalAlignment.Center,
+			Padding = UDim.new(0, 14),
+		}),
+		create("UICorner", { CornerRadius = UDim.new(0, 8) }),
+	})
+
+	local hints = {
+		{ key = "좌클릭", label = "당기기", color = Theme.Colors.Accent },
+		{ key = "우클릭", label = "밀기", color = Theme.Colors.AccentWarm },
+		{ key = "TAB", label = "스테이지 · 랭킹", color = Theme.Colors.TextDim },
+		{ key = "B", label = "상점", color = Theme.Colors.TextDim },
+	}
+
+	for index, hint in hints do
+		local row = create("Frame", {
+			LayoutOrder = index,
+			Size = UDim2.fromOffset(if index <= 2 then 84 else 112, 20),
+			BackgroundTransparency = 1,
+			Parent = hintFrame,
+		})
+
+		create("TextLabel", {
+			Size = UDim2.new(1, 0, 1, 0),
+			BackgroundTransparency = 1,
+			Font = Theme.Font,
+			RichText = true,
+			Text = `<font color="#{hint.color:ToHex()}"><b>{hint.key}</b></font>  {hint.label}`,
+			TextColor3 = Theme.Colors.TextDim,
+			TextSize = 12,
+			Parent = row,
+		})
+	end
 end
 
 local function flashSplit(text: string, color: Color3)
@@ -262,12 +324,18 @@ local function flashSplit(text: string, color: Color3)
 	}):Play()
 end
 
+--- The hint strip belongs to the hub and to practice, not to a timed run.
+local function setHintsVisible(visible: boolean)
+	hintFrame.Visible = visible and UserInputService.KeyboardEnabled
+end
+
 local function onRunUpdate(update)
 	if update.kind == "Started" then
 		local definition = StageConfig.Get(update.stageId)
 		stageLabel.Text = if definition then definition.displayName else update.stageId
 		runFrame.Visible = true
 		checkpointLabel.Text = ""
+		setHintsVisible(false)
 	elseif update.kind == "Checkpoint" then
 		flashSplit(
 			`체크포인트 {update.checkpointIndex}/{update.checkpointTotal} · {TimeFormat.Clock(update.elapsedMs or 0)}`,
@@ -275,11 +343,13 @@ local function onRunUpdate(update)
 		)
 	elseif update.kind == "Aborted" then
 		runFrame.Visible = false
+		setHintsVisible(true)
 		if update.rejectReason == "died" then
 			flashSplit("기록 무효 · 사망", Theme.Colors.Bad)
 		end
 	elseif update.kind == "Finished" then
 		runFrame.Visible = false
+		setHintsVisible(true)
 		if update.rejected then
 			flashSplit(`기록 무효 · {update.rejectReason or "검증 실패"}`, Theme.Colors.Bad)
 		end

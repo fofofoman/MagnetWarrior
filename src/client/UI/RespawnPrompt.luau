@@ -23,6 +23,7 @@ local Net = require(Shared.Net)
 
 local ShopPanel = require(script.Parent.ShopPanel)
 local Theme = require(script.Parent.Theme)
+local UiState = require(script.Parent.UiState)
 
 local RespawnPrompt = {}
 
@@ -61,6 +62,9 @@ local function show()
 	visible = true
 	frame.Visible = true
 	refreshButton()
+	-- Dying while browsing is not the moment to keep a menu up. It also re-arms
+	-- the magnet for the character that is about to spawn.
+	UiState.CloseAll()
 end
 
 local function hide()
@@ -73,6 +77,7 @@ local function build()
 		Name = "MagnetWarriorRespawn",
 		ResetOnSpawn = false,
 		IgnoreGuiInset = true,
+		DisplayOrder = 20, -- above any panel: dying is not something to hide
 		Parent = player:WaitForChild("PlayerGui"),
 	})
 

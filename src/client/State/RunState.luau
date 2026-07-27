@@ -21,8 +21,10 @@ local Types = require(Shared.Types)
 
 local RunState = {}
 
+--- Every update the server sends, in the order it sent them. One signal rather
+--- than a family of them: subscribers already branch on `update.kind`, and a
+--- second "finished" signal only made ordering between the two ambiguous.
 RunState.Changed = Signal.new() -- (update: Types.RunUpdate)
-RunState.Finished = Signal.new() -- (update: Types.RunUpdate)
 
 local active = false
 local stageId: string? = nil
@@ -88,10 +90,6 @@ local function onUpdate(update: Types.RunUpdate)
 	end
 
 	RunState.Changed:Fire(update)
-
-	if update.kind == "Finished" or update.kind == "Aborted" then
-		RunState.Finished:Fire(update)
-	end
 end
 
 function RunState.Start()

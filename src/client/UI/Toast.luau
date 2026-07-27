@@ -90,6 +90,11 @@ function Toast.Start()
 		Name = "MagnetWarriorToasts",
 		ResetOnSpawn = false,
 		IgnoreGuiInset = true,
+		-- Top of the stack. Most notifications answer something the player just
+		-- did *inside* a panel — "이미 보유 중입니다", "해당 외형을 보유하고 있지
+		-- 않습니다" — so rendering under that panel would hide the reply to the
+		-- click that caused it.
+		DisplayOrder = 30,
 		Parent = player:WaitForChild("PlayerGui"),
 	})
 

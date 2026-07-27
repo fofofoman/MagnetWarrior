@@ -165,13 +165,6 @@ local function step()
 	end
 end
 
---- True while the wall is magnetic. Layout authors can use this from other
---- systems; the stages themselves rely on the visual instead.
-function MotionService.IsLive(part: BasePart): boolean
-	local state = states[part]
-	return state == nil or state.live
-end
-
 function MotionService.Start()
 	for _, instance in CollectionService:GetTagged(GameConfig.Tags.Kinetic) do
 		register(instance)
