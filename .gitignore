@@ -1,0 +1,22 @@
+# Roblox place / model builds
+*.rbxl
+*.rbxlx
+*.rbxl.lock
+*.rbxlx.lock
+*.rbxm
+*.rbxmx
+/build/
+
+# Tooling
+sourcemap.json
+/roblox.toml
+/.lune/
+/Packages/
+/ServerPackages/
+/DevPackages/
+
+# Editor / OS
+.DS_Store
+.vscode/*
+!.vscode/settings.json
+*.swp
