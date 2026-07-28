@@ -124,6 +124,17 @@ local layout: StageBuilder.Layout = {
 		},
 	},
 
+	-- The walkways are only 14 wide, so there is no going around — these two are
+	-- deliberately shallow enough to clear with a running jump. On a narrow
+	-- catwalk with drones closing in, a five-stud gap you have to time is worth
+	-- more than a pool you would simply walk past.
+	hazards = {
+		{ name = "SlagWalkA", size = Vector3.new(14, 0.6, 5), position = Vector3.new(0, 1.3, 52) },
+		{ name = "SlagWalkC", size = Vector3.new(14, 0.6, 5), position = Vector3.new(0, 1.3, 238) },
+		-- The final arena is wide enough to route around instead.
+		{ name = "SlagArena", size = Vector3.new(28, 0.6, 20), position = Vector3.new(0, 1.3, 335) },
+	},
+
 	start = { position = Vector3.new(0, 6, 12), size = Vector3.new(30, 10, 6) },
 	checkpoints = {
 		{ position = Vector3.new(0, 6, 100), size = Vector3.new(30, 10, 6) },

@@ -149,6 +149,18 @@ local layout: StageBuilder.Layout = {
 		},
 	},
 
+	-- Slag, laid so it never touches the island pillars — those are the cover and
+	-- the vantage points, and burying them would remove the answer rather than
+	-- pose the question.
+	hazards = {
+		{ name = "SlagRoom1", size = Vector3.new(32, 0.6, 22), position = Vector3.new(-16, 1.3, 30) },
+		-- Between the two pillars at x ±22, so crossing the room means committing
+		-- to one side of it.
+		{ name = "SlagRoom2", size = Vector3.new(26, 0.6, 24), position = Vector3.new(0, 1.3, 116) },
+		-- Across the exit approach: the last fight ends with a routing choice.
+		{ name = "SlagRoom3", size = Vector3.new(40, 0.6, 16), position = Vector3.new(0, 1.3, 232) },
+	},
+
 	start = { position = Vector3.new(0, 6, -12), size = Vector3.new(30, 10, 6) },
 	checkpoints = {
 		{ position = Vector3.new(0, 6, 70), size = Vector3.new(18, 10, 6) },

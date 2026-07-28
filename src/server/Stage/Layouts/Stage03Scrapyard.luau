@@ -126,6 +126,19 @@ local layout: StageBuilder.Layout = {
 		},
 	},
 
+	-- Slag. Each arena keeps a clear lane down at least one side, so these are a
+	-- routing problem rather than a wall: the middle of the room — the natural
+	-- place to stand still and spin in circles — is the part that costs health.
+	hazards = {
+		-- Arena 1: dead centre, 21 studs of clear floor either side.
+		{ name = "SlagA", size = Vector3.new(30, 0.6, 20), position = Vector3.new(0, 1.3, 22) },
+		-- Arena 2: pushed left, so the same answer does not work twice.
+		{ name = "SlagB", size = Vector3.new(34, 0.6, 22), position = Vector3.new(-13, 1.3, 100) },
+		-- Arena 3 is the biggest room and gets two, offset into an S.
+		{ name = "SlagC1", size = Vector3.new(32, 0.6, 18), position = Vector3.new(-20, 1.3, 168) },
+		{ name = "SlagC2", size = Vector3.new(32, 0.6, 18), position = Vector3.new(20, 1.3, 202) },
+	},
+
 	start = { position = Vector3.new(0, 6, -12), size = Vector3.new(30, 10, 6) },
 	checkpoints = {
 		{ position = Vector3.new(0, 6, 62), size = Vector3.new(18, 10, 6) },

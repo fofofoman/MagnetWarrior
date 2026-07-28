@@ -107,6 +107,14 @@ local layout: StageBuilder.Layout = {
 		},
 	},
 
+	-- Exactly one, and it is jumpable. This is the stage that teaches assembly;
+	-- a floor full of things to avoid while you are still learning to place a
+	-- slab teaches nothing. It sits past the bridge and short of the supply
+	-- ledge, so it taxes the walk back and forth rather than the placement.
+	hazards = {
+		{ name = "SlagFar", size = Vector3.new(40, 0.6, 5), position = Vector3.new(0, 1.3, 112) },
+	},
+
 	start = { position = Vector3.new(0, 6, 12), size = Vector3.new(30, 10, 6) },
 	checkpoints = {
 		{ position = Vector3.new(0, 6, 96), size = Vector3.new(30, 10, 6) },

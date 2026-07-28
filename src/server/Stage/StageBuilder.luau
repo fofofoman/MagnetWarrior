@@ -70,6 +70,20 @@ export type BlockSpec = {
 	group: string,
 }
 
+--- A patch of floor that hurts to stand on. Built non-colliding and
+--- non-queryable, so it is something you route around rather than something that
+--- blocks you or eats a magnet shot aimed across it.
+---
+--- HazardService does the damage (35, once a second). Keep these shallow enough
+--- to clear with a jump — the point is to make a floor cost something to cross,
+--- not to gate progress behind a hazard nobody can pass.
+export type HazardSpec = {
+	name: string?,
+	size: Vector3,
+	position: Vector3,
+	color: Color3?,
+}
+
 export type GateSpec = {
 	id: string,
 	position: Vector3,
@@ -109,6 +123,7 @@ export type Layout = {
 	sockets: { SocketSpec }?,
 	blocks: { BlockSpec }?,
 	gates: { GateSpec }?,
+	hazards: { HazardSpec }?,
 	kinetics: { KineticSpec }?,
 	boss: BossSpec?,
 	--- Y below which the player is killed. Defaults to 60 studs under spawn.
@@ -132,6 +147,7 @@ local MAGNET_RED = Color3.fromRGB(255, 96, 88)
 local TRIGGER_GREEN = Color3.fromRGB(88, 224, 132)
 local TRIGGER_GOLD = Color3.fromRGB(255, 206, 84)
 local CHECKPOINT_CYAN = Color3.fromRGB(102, 217, 232)
+local HAZARD_ORANGE = Color3.fromRGB(255, 122, 48)
 
 StageBuilder.Palette = {
 	Steel = STEEL,
@@ -299,6 +315,30 @@ function StageBuilder.Build(definition: Types.StageDefinition, layout: Layout, p
 			tags = { GameConfig.Tags.PuzzleSocket },
 			attributes = { StageId = definition.id, PuzzleGroup = spec.group },
 		}, origin, puzzleFolder)
+	end
+
+	-- Hazards: slag, molten channels, grinder strips.
+	local hazardFolder = Instance.new("Folder")
+	hazardFolder.Name = "Hazards"
+	hazardFolder.Parent = model
+
+	for index, spec in layout.hazards or {} do
+		makePart({
+			name = spec.name or `Hazard_{index}`,
+			size = spec.size,
+			position = spec.position,
+			anchored = true,
+			-- Walk through it and take the damage; it is a cost, not a wall.
+			canCollide = false,
+			-- Kept out of every raycast so a hazard laid across an arena floor
+			-- cannot swallow a magnet shot aimed over it.
+			canQuery = false,
+			color = spec.color or HAZARD_ORANGE,
+			material = Enum.Material.Neon,
+			transparency = 0.25,
+			tags = { GameConfig.Tags.Hazard },
+			attributes = { StageId = definition.id },
+		}, origin, hazardFolder)
 	end
 
 	-- Kinetic walls. Built live (magnetic) and tagged Kinetic; MotionService

@@ -153,6 +153,14 @@ local layout: StageBuilder.Layout = {
 		},
 	},
 
+	-- Grinder strips, on the two platforms wide enough to carry them. Platform 1
+	-- and the Landing both hold checkpoints and are left clean — a hazard laid
+	-- across the one spot a player has to stand on is a tax, not a decision.
+	hazards = {
+		{ name = "GrinderPuzzle", size = Vector3.new(44, 0.6, 5), position = Vector3.new(0, 1.3, 182) },
+		{ name = "GrinderPlatform3", size = Vector3.new(32, 0.6, 5), position = Vector3.new(0, 1.3, 274) },
+	},
+
 	start = { position = Vector3.new(0, 6, 8), size = Vector3.new(28, 10, 6) },
 	checkpoints = {
 		{ position = Vector3.new(0, 6, 122), size = Vector3.new(26, 10, 6) },

@@ -43,23 +43,36 @@ SPEED_PUZZLE   = 16.0   # carrying and placing between stops
 SPEED_LAUNCH   = 30.0   # push-off traversal, the fastest honest average
 SPEED_DEFAULT  = 24.0
 
-COST_PER_ENEMY   = 2.8  # approach, aim, commit, confirm the kill
+# Raised with the drone health pass. A Push is attenuated by distance, so at 115
+# HP a Scrapper only dies to a slam thrown from inside ~46 studs where 60 HP died
+# to a poke from 80. Killing things now means closing on them first.
+COST_PER_ENEMY   = 3.6  # close the distance, aim, commit, confirm the kill
 COST_PER_SOCKET  = 8.0  # fetch a slab, drag it in stages, place it precisely
 COST_PER_GATE    = 1.2  # the open tween plus reacting to it
 COST_PER_WALL    = 3.0  # turn around, aim at it, fire, recover
+COST_PER_HAZARD  = 1.6  # jump it, or walk the long way round it
 PULSE_WAIT_SHARE = 0.6  # you usually just miss the window and wait for the next
 
 # Applied to the final estimate. See the note on pessimism above.
-GOLD_MARGIN = 1.25
+#
+# Tightened from 1.25 with the difficulty pass. The estimate underneath it is
+# already deliberately slower than a competent run, so this is the slack on top
+# of a pessimistic number rather than on top of a realistic one — but 25% of
+# slack meant gold arrived without ever chaining a launch, which made the top
+# medal a participation award.
+GOLD_MARGIN = 1.15
 
 # Boss fights, from HP / damage-per-window * window length. See MagnetConfig's
-# worked example and BossService for where these come from.
-BOSS_SECONDS = {"collector": 30.0, "furnace": 51.0}
+# worked example and BossService for where these come from. Both went up with
+# the armour-window pass: the collector's window fell 4.0s -> 3.0s against 1000
+# HP, the furnace's 3.5s -> 2.8s against 1800.
+BOSS_SECONDS = {"collector": 43.0, "furnace": 72.0}
 
-# The ratios the hand-authored table already used, kept so the medal spread
-# feels the same as before.
-SILVER_RATIO = 1.35
-BRONZE_RATIO = 1.90
+# Bronze at +90% of gold was awarded for finishing at all, which made two of the
+# three medals meaningless. Silver now wants a clean run and bronze wants a run
+# that did not go badly wrong.
+SILVER_RATIO = 1.25
+BRONZE_RATIO = 1.60
 # minPossibleMs is an anti-cheat floor, not a target. Deriving it purely from
 # path length at the audit ceiling produces a few seconds, which is useless: the
 # per-segment check in RunSessionService divides this floor across the segments,
@@ -124,6 +137,7 @@ def analyse(path):
     sockets = len(socket_entries)
     gates = len(re.findall(r"openBy = ", block(src, "gates")))
     walls = len(re.findall(r"surface = true", block(src, "magnetic")))
+    hazards = len(re.findall(r"\{ name = ", block(src, "hazards")))
 
     # Slabs have to be fetched. That round trip is real distance the straight
     # checkpoint route does not contain.
@@ -167,6 +181,7 @@ def analyse(path):
     seconds += enemies * COST_PER_ENEMY
     seconds += sockets * COST_PER_SOCKET
     seconds += gates * COST_PER_GATE
+    seconds += hazards * COST_PER_HAZARD
     seconds += pulsing * beat * PULSE_WAIT_SHARE
     # Only count launch walls on stages where they *are* the traversal; on a
     # combat stage they are scenery to slam things into.
@@ -185,6 +200,7 @@ def analyse(path):
         "gates": gates,
         "pulsing": pulsing,
         "boss": boss_id,
+        "hazards": hazards,
         "gold": seconds,
         "hardFloor": path_length / AUDIT_CEILING,
         "walls": walls,

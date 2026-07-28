@@ -160,6 +160,18 @@ local layout: StageBuilder.Layout = {
 		},
 	},
 
+	-- Molten channels. It is a foundry; the floor should be part of the hazard.
+	-- Two per assembly room, running the full width and jumpable, so every trip
+	-- between the supply ledge and the sockets crosses them twice. Placed clear
+	-- of both supply ledges — the spot you stand on to work is never the spot
+	-- that hurts.
+	hazards = {
+		{ name = "ChannelA1", size = Vector3.new(56, 0.6, 5), position = Vector3.new(0, 1.3, 36) },
+		{ name = "ChannelA2", size = Vector3.new(56, 0.6, 5), position = Vector3.new(0, 1.3, 62) },
+		{ name = "ChannelB1", size = Vector3.new(64, 0.6, 5), position = Vector3.new(0, 1.3, 300) },
+		{ name = "ChannelB2", size = Vector3.new(64, 0.6, 5), position = Vector3.new(0, 1.3, 330) },
+	},
+
 	start = { position = Vector3.new(0, 6, 12), size = Vector3.new(30, 10, 6) },
 	checkpoints = {
 		{ position = Vector3.new(0, 6, 151), size = Vector3.new(30, 10, 6) },

@@ -40,7 +40,11 @@ local FADED = Color3.fromRGB(38, 30, 34)
 local AI_RATE = 15 -- Hz
 local HOVER_HEIGHT = 5 -- studs above the ground the drone tries to hold
 local CONTACT_RANGE = 6.5
-local CONTACT_COOLDOWN = 1.1
+
+--- Per drone, so being surrounded stacks. At 1.1s a player could stand inside a
+--- Scrapper for ten seconds and walk away; the arenas were survivable by simply
+--- not moving, which is the opposite of what a game about momentum wants.
+local CONTACT_COOLDOWN = 0.85
 
 export type EnemyKind = {
 	displayName: string,
@@ -56,37 +60,55 @@ export type EnemyKind = {
 	stationary: boolean?,
 }
 
+-- Health values are chosen against the slam damage curve, not picked by feel.
+-- A Push is clamped to MagnetConfig.PushImpulse and then attenuated by distance
+-- (FalloffAtMaxRange 0.45 at 90 studs), so how hard a drone lands is a function
+-- of how close you were when you threw it. Health decides the range at which a
+-- slam stops being lethal — which is the whole reason to raise it. At 60 HP a
+-- Scrapper died to a lazy poke from 80 studs; at 115 the kill radius is ~46, and
+-- closing the distance becomes the thing the combat stages ask of you.
+--
+-- One-shot kills are kept on purpose. Grabbing something and burying it in a
+-- wall is the core pleasure here, and turning every drone into a damage sponge
+-- would trade difficulty for tedium. The pressure comes from contact damage
+-- instead: the arenas got more dangerous to stand in, not slower to clear.
 local kinds: { [string]: EnemyKind } = {
 	Scrapper = {
 		displayName = "스크래퍼",
-		health = 60,
+		health = 115,
 		speed = 20,
 		aggroRange = 70,
-		contactDamage = 12,
+		contactDamage = 18,
 		size = Vector3.new(4, 4, 4),
 		color = Color3.fromRGB(226, 88, 72),
 		density = 0.55,
 	},
 	Hauler = {
 		displayName = "하울러",
-		health = 150,
+		health = 220,
 		speed = 12,
 		aggroRange = 60,
-		contactDamage = 22,
+		-- Slow, but it hits like the machine it is: four contacts and you are
+		-- dead. A Hauler is not something to fight past, it is something to move.
+		contactDamage = 28,
 		size = Vector3.new(6, 6, 6),
 		color = Color3.fromRGB(196, 112, 42),
 		-- Mass 108. Heavy enough that slamming it into a wall barely scratches
-		-- it (17 damage against 150 health), light enough that the magnet can
+		-- it (17 damage against 220 health), light enough that the magnet can
 		-- still pick it up and throw it. That combination is its whole role: the
 		-- Hauler is not something you slam, it is something you slam *with*.
 		density = 0.5,
 	},
 	Spark = {
 		displayName = "스파크",
-		health = 35,
+		health = 55,
 		speed = 30,
 		aggroRange = 85,
-		contactDamage = 8,
+		-- Mass 10.8 means a Push reaches full speed at any range, so a Spark is a
+		-- one-shot from anywhere no matter what its health is. Raising it buys
+		-- nothing against the magnet; the number that matters for a Spark is the
+		-- damage it does while you are busy with something heavier.
+		contactDamage = 13,
 		size = Vector3.new(3, 3, 3),
 		color = Color3.fromRGB(255, 214, 92),
 		density = 0.4,
@@ -101,7 +123,7 @@ local kinds: { [string]: EnemyKind } = {
 	--   7³ × 0.2 ≈ 69,  8³ × 0.13 ≈ 67
 	CollectorCore = {
 		displayName = "폐기물 수집기",
-		health = 900,
+		health = 1000,
 		speed = 0,
 		aggroRange = 0,
 		contactDamage = 0,
@@ -112,7 +134,7 @@ local kinds: { [string]: EnemyKind } = {
 	},
 	FurnaceCore = {
 		displayName = "대자석로",
-		health = 1500,
+		health = 1800,
 		speed = 0,
 		aggroRange = 0,
 		contactDamage = 0,

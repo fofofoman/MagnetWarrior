@@ -84,9 +84,13 @@ local layout: StageBuilder.Layout = {
 		kind = "CollectorCore",
 		-- Raised so the machine body sits on the floor rather than sunk into it.
 		position = Vector3.new(0, 13, 122),
-		closedSeconds = 6,
-		openSeconds = 4,
-		throwInterval = 2.6,
+		-- The window is the difficulty. Three seconds fits one yank and roughly
+		-- one deflected scrap, so a wasted window costs a whole seven-second
+		-- wait — enough that missing them is felt without being unreadable. The
+		-- telegraph is 1.25s (BossService), so the plates still announce it.
+		closedSeconds = 7,
+		openSeconds = 3,
+		throwInterval = 2.2,
 		throwSpeed = 82,
 	},
 
@@ -97,6 +101,16 @@ local layout: StageBuilder.Layout = {
 			size = Vector3.new(34, 18, 3),
 			openBy = { kind = "Enemies", group = BossService.GroupFor("collector") },
 		},
+	},
+
+	-- Two pools flanking the approach, leaving a 16-stud lane straight up the
+	-- middle. That lane is also the boss's throw line, which is the whole idea:
+	-- the safe floor and the safe angle are not the same place. It also gives the
+	-- seven seconds of sealed armour something to do — you spend them moving,
+	-- not standing still waiting for the plates.
+	hazards = {
+		{ name = "SlagLeft", size = Vector3.new(34, 0.6, 36), position = Vector3.new(-25, 1.3, 108) },
+		{ name = "SlagRight", size = Vector3.new(34, 0.6, 36), position = Vector3.new(25, 1.3, 108) },
 	},
 
 	start = { position = Vector3.new(0, 6, 24), size = Vector3.new(18, 10, 6) },

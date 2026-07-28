@@ -147,11 +147,16 @@ local layout: StageBuilder.Layout = {
 		id = "furnace",
 		kind = "FurnaceCore",
 		position = Vector3.new(0, 14, 356),
-		closedSeconds = 7,
-		openSeconds = 3.5,
-		throwInterval = 2.0,
+		-- Tighter than the miniboss on every axis, and the escorts arrive often
+		-- enough to matter: at 16s a wave was cleared and forgotten before the
+		-- next, at 12s there is usually something alive behind you while you are
+		-- lining up on the core. 2.8s is still comfortably above the 1.25s
+		-- telegraph, so the window is short, not hidden.
+		closedSeconds = 8,
+		openSeconds = 2.8,
+		throwInterval = 1.7,
 		throwSpeed = 95,
-		adds = { kind = "Spark", count = 3, interval = 16, spread = 22 },
+		adds = { kind = "Spark", count = 3, interval = 12, spread = 22 },
 	},
 
 	gates = {
@@ -167,6 +172,17 @@ local layout: StageBuilder.Layout = {
 			size = Vector3.new(34, 18, 3),
 			openBy = { kind = "Enemies", group = BossService.GroupFor("furnace") },
 		},
+	},
+
+	-- Same shape as the miniboss arena but larger, so a player who learned that
+	-- fight recognises the floor immediately. The central lane is 22 wide here —
+	-- the furnace throws faster and spawns escorts, and a corridor as tight as
+	-- the collector's would have been a coin flip rather than a choice.
+	hazards = {
+		{ name = "SlagLeft", size = Vector3.new(38, 0.6, 44), position = Vector3.new(-30, 1.3, 340) },
+		{ name = "SlagRight", size = Vector3.new(38, 0.6, 44), position = Vector3.new(30, 1.3, 340) },
+		-- One jumpable channel on the assembly floor before the arena.
+		{ name = "ChannelPuzzle", size = Vector3.new(50, 0.6, 5), position = Vector3.new(0, 1.3, 180) },
 	},
 
 	start = { position = Vector3.new(0, 6, 10), size = Vector3.new(30, 10, 6) },
