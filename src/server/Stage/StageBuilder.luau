@@ -75,8 +75,10 @@ export type BlockSpec = {
 --- blocks you or eats a magnet shot aimed across it.
 ---
 --- HazardService does the damage (35, once a second). Keep these shallow enough
---- to clear with a jump — the point is to make a floor cost something to cross,
---- not to gate progress behind a hazard nobody can pass.
+--- to clear with a jump — at this place's gravity of 145 a running jump covers
+--- roughly 11 studs, so 5-6 is comfortable — or leave a lane beside them. The
+--- point is to make a floor cost something to cross, not to gate progress behind
+--- a hazard nobody can pass.
 export type HazardSpec = {
 	name: string?,
 	size: Vector3,
@@ -431,11 +433,12 @@ function StageBuilder.Build(definition: Types.StageDefinition, layout: Layout, p
 	--
 	-- Deliberately far larger than any stage's geometry. HazardService only kills
 	-- a player who is below the plane *and* inside its footprint, so anyone who
-	-- clears the edge falls right past it — a chained launch at
-	-- MagnetConfig.ChainedSpeedCap carries about 125 studs during the drop, and
-	-- stage 8 already reaches Z 558 against the old 900-stud plane. Overshooting
-	-- costs nothing: the part is invisible, non-colliding, non-queryable, and
-	-- stages sit 2000 studs apart so neighbouring planes still cannot touch.
+	-- clears the edge falls right past it. This place runs at gravity 145, not
+	-- Roblox's 196.2, so a 90-stud drop lasts 1.11s and a chained launch at
+	-- MagnetConfig.ChainedSpeedCap covers ~143 studs of it — and stage 8 already
+	-- reaches Z 558 against the old 900-stud plane. Overshooting costs nothing:
+	-- the part is invisible, non-colliding, non-queryable, and stages sit 2000
+	-- studs apart so neighbouring planes still cannot touch.
 	local killY = layout.killY or (layout.spawn.Y - 90)
 	makePart({
 		name = "KillPlane",
